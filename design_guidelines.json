@@ -1,0 +1,157 @@
+{
+  "theme": "Light & Dark Toggle (Primary focus on Premium Dark Mode for AI/Finance vibe)",
+  "archetype": "Archetype 4: Swiss & High-Contrast (adapted for Premium Finance / Mobile)",
+  "color_palette": {
+    "light": {
+      "background": "#FFFFFF",
+      "surface": "#F4F4F5",
+      "surface_elevated": "#FFFFFF",
+      "text_primary": "#09090B",
+      "text_secondary": "#52525B",
+      "text_tertiary": "#A1A1AA",
+      "primary": "#09090B",
+      "primary_foreground": "#FAFAFA",
+      "accent_bullish": "#16A34A",
+      "accent_bullish_bg": "rgba(22, 163, 74, 0.1)",
+      "accent_bearish": "#DC2626",
+      "accent_bearish_bg": "rgba(220, 38, 38, 0.1)",
+      "accent_neutral": "#6366F1",
+      "border": "#E4E4E7",
+      "paywall_gradient": ["#F4F4F5", "#E4E4E7"]
+    },
+    "dark": {
+      "background": "#09090B",
+      "surface": "#18181B",
+      "surface_elevated": "#27272A",
+      "text_primary": "#FAFAFA",
+      "text_secondary": "#A1A1AA",
+      "text_tertiary": "#52525B",
+      "primary": "#FAFAFA",
+      "primary_foreground": "#09090B",
+      "accent_bullish": "#22C55E",
+      "accent_bullish_bg": "rgba(34, 197, 94, 0.15)",
+      "accent_bearish": "#EF4444",
+      "accent_bearish_bg": "rgba(239, 68, 68, 0.15)",
+      "accent_neutral": "#818CF8",
+      "border": "#27272A",
+      "paywall_gradient": ["#18181B", "#27272A"]
+    }
+  },
+  "typography": {
+    "rules": "Never use Inter for headings. Use tracking-tight for headings.",
+    "fonts": {
+      "heading": "Cabinet Grotesk, System",
+      "body": "Inter, System",
+      "mono": "JetBrains Mono, SF Mono"
+    },
+    "scale": {
+      "h1": { "size": "36px", "weight": "700", "tracking": "-0.04em" },
+      "h2": { "size": "28px", "weight": "600", "tracking": "-0.02em" },
+      "h3": { "size": "20px", "weight": "600", "tracking": "-0.01em" },
+      "body_lg": { "size": "18px", "weight": "400", "tracking": "0em" },
+      "body": { "size": "16px", "weight": "400", "tracking": "0em" },
+      "label": { "size": "14px", "weight": "500", "tracking": "0.01em" },
+      "caption": { "size": "12px", "weight": "400", "tracking": "0.02em", "uppercase": true }
+    }
+  },
+  "spacing_and_layout": {
+    "grid_system": "8pt base grid",
+    "screen_padding": "16px",
+    "section_gap": "32px",
+    "item_gap": "12px",
+    "card_padding": "16px",
+    "border_radius": {
+      "card": "12px",
+      "button": "9999px",
+      "chip": "8px"
+    },
+    "borders": "1px solid border color for definition, flat backgrounds."
+  },
+  "components_strategy": {
+    "navigation": {
+      "type": "Bottom Tab Bar",
+      "style": "Glassmorphism (backdrop-blur-xl), height 80px, icons scale up 1.1x on active."
+    },
+    "cards": {
+      "style": "Flat, 1px border. No shadows in dark mode. Very subtle shadow in light mode. Use surface color.",
+      "ai_insight_card": "Highlight with a subtle left border (2px) using accent_neutral."
+    },
+    "buttons": {
+      "primary": "Pill shape, full width for main actions, highly contrasting text.",
+      "secondary": "Outline or surface-colored pill."
+    },
+    "charts": {
+      "sparklines": "Used in watchlists/dashboard lists. 2px stroke, no axis, colored by bullish/bearish.",
+      "candlesticks": "Main stock view. 4px body, 1px wick, 2px gap. Green/Red.",
+      "ai_prediction_line": "Dashed line extending from current price.",
+      "confidence_intervals": "Overlapping polygons (70%, 90%, 95%) behind the prediction line with descending opacity (30%, 20%, 10%)."
+    },
+    "badges": {
+      "sentiment": "Small pill, background tint + text color (e.g., Bullish = green bg + green text)."
+    }
+  },
+  "screens": {
+    "auth": {
+      "description": "Welcome screen with AI branding. Sign in with Apple/Google buttons (full width, icon left, text center). Email/password standard inputs."
+    },
+    "dashboard": {
+      "header": "Greeting + Portfolio Total Value (massive mono font) + Daily P&L.",
+      "market_sentiment": "Gauge or horizontal bar chart showing overall AI sentiment (0-100 score).",
+      "top_movers": "Horizontal scroll of Bento-style cards showing Top Predicted Gainers/Losers with confidence %."
+    },
+    "screener": {
+      "header": "Sticky horizontal scroll filter chips (Confidence, Return, Sector, Cap).",
+      "list": "Vertical list. Each row shows Ticker, Company Name, Current Price, AI Score (0-100), Direction Arrow, and Accuracy %."
+    },
+    "stock_detail": {
+      "top": "Ticker, Name, Current Price, 24h Change.",
+      "chart": "Interactive candlestick chart + AI prediction cone (confidence intervals).",
+      "ai_reasoning": "Bento card showing 'Feature Importance' (horizontal bars for RSI, MACD, Volume, etc.) and LLM text summary.",
+      "similar_patterns": "Horizontal list of historical charts that match current setup."
+    },
+    "watchlist": {
+      "layout": "Vertical list. Swipe left to remove. Row shows Ticker, Sparkline, AI Prediction Direction, Price.",
+      "live_indicator": "Pulsing dot for real-time model updates."
+    },
+    "alerts": {
+      "layout": "Tabs: Active / Triggered. Cards showing Target Price, Current Distance progress bar, Notification toggles."
+    },
+    "settings_and_paywall": {
+      "settings": "List of toggles (Dark/Light mode, Notifications).",
+      "paywall": "Full-screen modal. Immersive dark theme regardless of app theme. High contrast, glassy checkmarks, 'Unlock AI Alpha' CTA."
+    }
+  },
+  "motion_and_interaction": {
+    "page_transitions": "Native horizontal slide.",
+    "prediction_reveal": "When AI data loads, staggered fade-in with slight vertical translation (Y: 10px -> 0px).",
+    "chart_scrubbing": "Crosshair with Haptic Feedback (impact light) on each candlestick focus.",
+    "swipe_actions": "Spring physics for watchlist row deletion."
+  },
+  "media": {
+    "images": [
+      {
+        "url": "https://images.pexels.com/photos/29832997/pexels-photo-29832997.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "category": "onboarding_background",
+        "description": "Abstract glowing bull, represents premium AI market analysis."
+      },
+      {
+        "url": "https://images.pexels.com/photos/6770775/pexels-photo-6770775.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "category": "premium_paywall_background",
+        "description": "Close up of digital market data, darkened with overlay for paywall backdrop."
+      }
+    ]
+  },
+  "testing": {
+    "data_testid_rules": "All interactive elements MUST include testID (React Native) or data-testid. Format: kebab-case, role-based. Example: testID='screener-filter-chip'"
+  },
+  "instructions_to_main_agent": [
+    "You are building a React Native Expo application. Use View, Text, TouchableOpacity, ScrollView, etc. DO NOT use HTML tags.",
+    "Use NativeWind for Tailwind styling.",
+    "Implement light and dark mode securely using NativeWind colorScheme or a custom context.",
+    "For icons, use vector icons like @expo/vector-icons or phosphor-react-native.",
+    "For charts, use react-native-svg or react-native-wagmi-charts/victory-native. Ensure confidence intervals are drawn securely.",
+    "Strictly adhere to the color hex codes for Bullish/Bearish states.",
+    "For the paywall, use Stripe React Native SDK if applicable, or mock the UI beautifully.",
+    "Ensure all interactive elements have testID props."
+  ]
+}
