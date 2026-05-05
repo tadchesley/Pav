@@ -12,13 +12,16 @@ export default function Settings() {
   const { theme, mode, toggle } = useTheme();
   const router = useRouter();
   const [paywall, setPaywall] = useState(false);
+  const [plan, setPlan] = useState<'monthly' | 'yearly'>('yearly');
+  const [agreedPremium, setAgreedPremium] = useState(false);
 
   const upgrade = async () => {
+    if (!agreedPremium) { Alert.alert('Agreement required', 'Please accept the Terms to continue.'); return; }
     try {
-      await api.post('/subscription/upgrade');
+      await api.post('/subscription/upgrade', { plan });
       await refreshUser();
-      setPaywall(false);
-      Alert.alert('Welcome to Premium', 'Subscription upgraded (MOCKED). Stripe integration deferred.');
+      setPaywall(false); setAgreedPremium(false);
+      Alert.alert('Welcome to Premium', `Subscribed to ${plan} plan (MOCKED). Stripe integration deferred.`);
     } catch { Alert.alert('Error', 'Upgrade failed'); }
   };
 
@@ -97,8 +100,8 @@ export default function Settings() {
             <TouchableOpacity onPress={() => setPaywall(false)} style={{ alignSelf: 'flex-end' }}>
               <Ionicons name="close" size={28} color="#FAFAFA" />
             </TouchableOpacity>
-            <View style={{ flex: 1, justifyContent: 'center' }}>
-              <Text style={{ color: '#FAFAFA', fontSize: 14, letterSpacing: 2, marginBottom: 8 }}>ALPHAPULSE PREMIUM</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={{ color: '#FAFAFA', fontSize: 14, letterSpacing: 2, marginBottom: 8, marginTop: 20 }}>ALPHAPULSE PREMIUM</Text>
               <Text style={{ color: '#FAFAFA', fontSize: 40, fontWeight: '700', letterSpacing: -1.5, marginBottom: 20 }}>Unlock AI Alpha</Text>
               {['Unlimited stocks tracked', 'Real-time AI predictions', 'Advanced screener filters', 'API access for algorithms', 'Regime change alerts'].map((f) => (
                 <View key={f} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
@@ -106,11 +109,58 @@ export default function Settings() {
                   <Text style={{ color: '#FAFAFA', marginLeft: 12, fontSize: 16 }}>{f}</Text>
                 </View>
               ))}
-            </View>
+
+              <View style={{ marginTop: 24 }}>
+                <TouchableOpacity testID="plan-yearly" onPress={() => setPlan('yearly')} style={{
+                  borderWidth: 2, borderColor: plan === 'yearly' ? '#FAFAFA' : '#3F3F46',
+                  backgroundColor: plan === 'yearly' ? 'rgba(250,250,250,0.06)' : 'transparent',
+                  borderRadius: 14, padding: 16, marginBottom: 10,
+                }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ color: '#FAFAFA', fontSize: 18, fontWeight: '700' }}>Yearly</Text>
+                        <View style={{ backgroundColor: '#22C55E', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8 }}>
+                          <Text style={{ color: '#09090B', fontSize: 10, fontWeight: '700' }}>SAVE 17%</Text>
+                        </View>
+                      </View>
+                      <Text style={{ color: '#A1A1AA', fontSize: 12, marginTop: 2 }}>$4.17/mo · billed annually</Text>
+                    </View>
+                    <Text style={{ color: '#FAFAFA', fontSize: 22, fontWeight: '700' }}>$49.99</Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity testID="plan-monthly" onPress={() => setPlan('monthly')} style={{
+                  borderWidth: 2, borderColor: plan === 'monthly' ? '#FAFAFA' : '#3F3F46',
+                  backgroundColor: plan === 'monthly' ? 'rgba(250,250,250,0.06)' : 'transparent',
+                  borderRadius: 14, padding: 16,
+                }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: '#FAFAFA', fontSize: 18, fontWeight: '700' }}>Monthly</Text>
+                      <Text style={{ color: '#A1A1AA', fontSize: 12, marginTop: 2 }}>Billed monthly · cancel anytime</Text>
+                    </View>
+                    <Text style={{ color: '#FAFAFA', fontSize: 22, fontWeight: '700' }}>$4.99</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity testID="toggle-agree-premium" onPress={() => setAgreedPremium(a => !a)} style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 20 }}>
+                <View style={{ width: 20, height: 20, borderWidth: 1.5, borderColor: '#3F3F46', borderRadius: 5, alignItems: 'center', justifyContent: 'center', marginTop: 2, backgroundColor: agreedPremium ? '#FAFAFA' : 'transparent' }}>
+                  {agreedPremium && <Ionicons name="checkmark" size={14} color="#09090B" />}
+                </View>
+                <Text style={{ flex: 1, marginLeft: 10, fontSize: 12, color: '#A1A1AA', lineHeight: 18 }}>
+                  I accept the <Text onPress={() => router.push('/terms')} style={{ color: '#FAFAFA', fontWeight: '600' }}>Terms of Service</Text> and acknowledge AI predictions are <Text style={{ color: '#EF4444', fontWeight: '600' }}>not financial advice</Text>. Subscription auto-renews until canceled.
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+
             <View>
-              <Text style={{ color: '#A1A1AA', fontSize: 12, textAlign: 'center', marginBottom: 12 }}>$19.99/month · Stripe checkout (MOCKED in MVP)</Text>
-              <TouchableOpacity testID="btn-confirm-upgrade" onPress={upgrade} style={{ backgroundColor: '#FAFAFA', padding: 18, borderRadius: 999, alignItems: 'center' }}>
-                <Text style={{ color: '#09090B', fontWeight: '700', fontSize: 16 }}>Upgrade now</Text>
+              <Text style={{ color: '#A1A1AA', fontSize: 11, textAlign: 'center', marginBottom: 10 }}>Stripe checkout (MOCKED in MVP) · Cancel anytime from Settings</Text>
+              <TouchableOpacity testID="btn-confirm-upgrade" onPress={upgrade} disabled={!agreedPremium} style={{ backgroundColor: '#FAFAFA', padding: 18, borderRadius: 999, alignItems: 'center', opacity: agreedPremium ? 1 : 0.5 }}>
+                <Text style={{ color: '#09090B', fontWeight: '700', fontSize: 16 }}>
+                  {plan === 'yearly' ? 'Start yearly — $49.99' : 'Start monthly — $4.99'}
+                </Text>
               </TouchableOpacity>
             </View>
           </SafeAreaView>

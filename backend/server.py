@@ -118,26 +118,68 @@ FINNHUB_BASE = "https://finnhub.io/api/v1"
 
 # Fallback seed data for demo when no Finnhub key is configured
 SEED_TICKERS = [
+    # Technology
     {"symbol": "AAPL", "name": "Apple Inc.", "sector": "Technology", "price": 189.50, "market_cap": 2950000000000},
     {"symbol": "MSFT", "name": "Microsoft Corp.", "sector": "Technology", "price": 421.30, "market_cap": 3130000000000},
     {"symbol": "GOOGL", "name": "Alphabet Inc.", "sector": "Technology", "price": 172.15, "market_cap": 2120000000000},
-    {"symbol": "AMZN", "name": "Amazon.com Inc.", "sector": "Consumer Cyclical", "price": 188.20, "market_cap": 1950000000000},
     {"symbol": "NVDA", "name": "NVIDIA Corp.", "sector": "Technology", "price": 875.40, "market_cap": 2160000000000},
-    {"symbol": "META", "name": "Meta Platforms Inc.", "sector": "Communication Services", "price": 497.80, "market_cap": 1270000000000},
+    {"symbol": "AMD", "name": "Advanced Micro Devices", "sector": "Technology", "price": 168.70, "market_cap": 273000000000},
+    {"symbol": "ORCL", "name": "Oracle Corp.", "sector": "Technology", "price": 142.30, "market_cap": 395000000000},
+    {"symbol": "CRM", "name": "Salesforce Inc.", "sector": "Technology", "price": 275.80, "market_cap": 268000000000},
+    {"symbol": "ADBE", "name": "Adobe Inc.", "sector": "Technology", "price": 518.20, "market_cap": 231000000000},
+    {"symbol": "INTC", "name": "Intel Corp.", "sector": "Technology", "price": 31.40, "market_cap": 133000000000},
+    {"symbol": "CSCO", "name": "Cisco Systems", "sector": "Technology", "price": 58.10, "market_cap": 235000000000},
+    {"symbol": "IBM", "name": "IBM Corp.", "sector": "Technology", "price": 212.50, "market_cap": 196000000000},
+    {"symbol": "QCOM", "name": "Qualcomm Inc.", "sector": "Technology", "price": 172.40, "market_cap": 191000000000},
+    # Consumer Cyclical
+    {"symbol": "AMZN", "name": "Amazon.com Inc.", "sector": "Consumer Cyclical", "price": 188.20, "market_cap": 1950000000000},
     {"symbol": "TSLA", "name": "Tesla Inc.", "sector": "Consumer Cyclical", "price": 248.30, "market_cap": 789000000000},
+    {"symbol": "HD", "name": "Home Depot", "sector": "Consumer Cyclical", "price": 382.10, "market_cap": 380000000000},
+    {"symbol": "NKE", "name": "Nike Inc.", "sector": "Consumer Cyclical", "price": 78.40, "market_cap": 117000000000},
+    {"symbol": "MCD", "name": "McDonald's Corp.", "sector": "Consumer Cyclical", "price": 289.60, "market_cap": 207000000000},
+    {"symbol": "SBUX", "name": "Starbucks Corp.", "sector": "Consumer Cyclical", "price": 94.20, "market_cap": 107000000000},
+    {"symbol": "LOW", "name": "Lowe's Companies", "sector": "Consumer Cyclical", "price": 242.80, "market_cap": 138000000000},
+    {"symbol": "TGT", "name": "Target Corp.", "sector": "Consumer Cyclical", "price": 141.30, "market_cap": 65000000000},
+    # Communication Services
+    {"symbol": "META", "name": "Meta Platforms Inc.", "sector": "Communication Services", "price": 497.80, "market_cap": 1270000000000},
+    {"symbol": "NFLX", "name": "Netflix Inc.", "sector": "Communication Services", "price": 641.20, "market_cap": 278000000000},
+    {"symbol": "DIS", "name": "Walt Disney Co.", "sector": "Communication Services", "price": 112.60, "market_cap": 205000000000},
+    {"symbol": "T", "name": "AT&T Inc.", "sector": "Communication Services", "price": 21.80, "market_cap": 156000000000},
+    {"symbol": "VZ", "name": "Verizon Communications", "sector": "Communication Services", "price": 41.20, "market_cap": 173000000000},
+    {"symbol": "CMCSA", "name": "Comcast Corp.", "sector": "Communication Services", "price": 42.50, "market_cap": 168000000000},
+    # Financial Services
     {"symbol": "BRK.B", "name": "Berkshire Hathaway", "sector": "Financial Services", "price": 412.10, "market_cap": 895000000000},
     {"symbol": "JPM", "name": "JPMorgan Chase", "sector": "Financial Services", "price": 198.70, "market_cap": 568000000000},
     {"symbol": "V", "name": "Visa Inc.", "sector": "Financial Services", "price": 276.50, "market_cap": 558000000000},
+    {"symbol": "MA", "name": "Mastercard Inc.", "sector": "Financial Services", "price": 458.30, "market_cap": 428000000000},
+    {"symbol": "BAC", "name": "Bank of America", "sector": "Financial Services", "price": 38.90, "market_cap": 301000000000},
+    {"symbol": "WFC", "name": "Wells Fargo & Co.", "sector": "Financial Services", "price": 58.70, "market_cap": 210000000000},
+    {"symbol": "GS", "name": "Goldman Sachs", "sector": "Financial Services", "price": 478.20, "market_cap": 153000000000},
+    {"symbol": "MS", "name": "Morgan Stanley", "sector": "Financial Services", "price": 101.40, "market_cap": 163000000000},
+    # Healthcare
     {"symbol": "JNJ", "name": "Johnson & Johnson", "sector": "Healthcare", "price": 156.20, "market_cap": 376000000000},
+    {"symbol": "UNH", "name": "UnitedHealth Group", "sector": "Healthcare", "price": 524.80, "market_cap": 484000000000},
+    {"symbol": "LLY", "name": "Eli Lilly & Co.", "sector": "Healthcare", "price": 782.40, "market_cap": 744000000000},
+    {"symbol": "PFE", "name": "Pfizer Inc.", "sector": "Healthcare", "price": 27.80, "market_cap": 158000000000},
+    {"symbol": "ABBV", "name": "AbbVie Inc.", "sector": "Healthcare", "price": 178.50, "market_cap": 315000000000},
+    {"symbol": "MRK", "name": "Merck & Co.", "sector": "Healthcare", "price": 124.30, "market_cap": 315000000000},
+    {"symbol": "TMO", "name": "Thermo Fisher Scientific", "sector": "Healthcare", "price": 558.20, "market_cap": 214000000000},
+    # Consumer Defensive
     {"symbol": "WMT", "name": "Walmart Inc.", "sector": "Consumer Defensive", "price": 62.40, "market_cap": 502000000000},
     {"symbol": "PG", "name": "Procter & Gamble", "sector": "Consumer Defensive", "price": 166.30, "market_cap": 391000000000},
-    {"symbol": "UNH", "name": "UnitedHealth Group", "sector": "Healthcare", "price": 524.80, "market_cap": 484000000000},
-    {"symbol": "HD", "name": "Home Depot", "sector": "Consumer Cyclical", "price": 382.10, "market_cap": 380000000000},
-    {"symbol": "BAC", "name": "Bank of America", "sector": "Financial Services", "price": 38.90, "market_cap": 301000000000},
+    {"symbol": "KO", "name": "Coca-Cola Co.", "sector": "Consumer Defensive", "price": 63.20, "market_cap": 272000000000},
+    {"symbol": "PEP", "name": "PepsiCo Inc.", "sector": "Consumer Defensive", "price": 171.80, "market_cap": 236000000000},
+    {"symbol": "COST", "name": "Costco Wholesale", "sector": "Consumer Defensive", "price": 842.50, "market_cap": 373000000000},
+    # Energy
     {"symbol": "XOM", "name": "Exxon Mobil", "sector": "Energy", "price": 118.40, "market_cap": 471000000000},
-    {"symbol": "DIS", "name": "Walt Disney Co.", "sector": "Communication Services", "price": 112.60, "market_cap": 205000000000},
-    {"symbol": "NFLX", "name": "Netflix Inc.", "sector": "Communication Services", "price": 641.20, "market_cap": 278000000000},
-    {"symbol": "AMD", "name": "Advanced Micro Devices", "sector": "Technology", "price": 168.70, "market_cap": 273000000000},
+    {"symbol": "CVX", "name": "Chevron Corp.", "sector": "Energy", "price": 158.60, "market_cap": 294000000000},
+    {"symbol": "COP", "name": "ConocoPhillips", "sector": "Energy", "price": 112.30, "market_cap": 132000000000},
+    {"symbol": "SLB", "name": "Schlumberger", "sector": "Energy", "price": 48.20, "market_cap": 68000000000},
+    # Industrials
+    {"symbol": "BA", "name": "Boeing Co.", "sector": "Industrials", "price": 176.80, "market_cap": 108000000000},
+    {"symbol": "CAT", "name": "Caterpillar Inc.", "sector": "Industrials", "price": 342.70, "market_cap": 170000000000},
+    {"symbol": "GE", "name": "General Electric", "sector": "Industrials", "price": 168.40, "market_cap": 183000000000},
+    {"symbol": "UPS", "name": "United Parcel Service", "sector": "Industrials", "price": 138.60, "market_cap": 118000000000},
 ]
 
 SEED_BY_SYMBOL = {t["symbol"]: t for t in SEED_TICKERS}
@@ -287,7 +329,7 @@ def statistical_prediction(symbol: str, indicators: dict, candles: dict) -> dict
     score += max(min(momentum * 1.2, 15), -15)
 
     score = max(0, min(100, score))
-    direction = "UP" if score > 55 else ("DOWN" if score < 45 else "NEUTRAL")
+    direction = "UP" if score > 52 else ("DOWN" if score < 48 else "NEUTRAL")
     expected_return_pct = round((score - 50) * 0.15, 2)
     target_price = round(current * (1 + expected_return_pct / 100), 2)
     confidence = round(min(0.95, 0.5 + abs(score - 50) / 100), 2)
@@ -328,7 +370,7 @@ async def llm_analysis(symbol: str, indicators: dict, stat_pred: dict, profile: 
                 "feature_importance (object with keys rsi, moving_avg, momentum, volatility, sentiment — numeric values summing to 1). "
                 "No markdown, no prose outside JSON."
             ),
-        ).with_model("anthropic", "claude-sonnet-4-5").with_max_tokens(700)
+        ).with_model("anthropic", "claude-sonnet-4-5")
 
         prompt = (
             f"Analyze {symbol} ({profile.get('name','')}).\n"
@@ -689,9 +731,13 @@ async def delete_alert(alert_id: str, user=Depends(current_user)):
 
 # ---------- Subscription (mock) ----------
 @api.post("/subscription/upgrade")
-async def upgrade(user=Depends(current_user)):
-    await db.users.update_one({"id": user["id"]}, {"$set": {"tier": "premium"}})
-    return {"tier": "premium", "message": "Upgraded (MOCKED — Stripe integration deferred)"}
+async def upgrade(body: dict, user=Depends(current_user)):
+    plan = body.get("plan", "monthly")
+    if plan not in ("monthly", "yearly"):
+        raise HTTPException(400, "plan must be 'monthly' or 'yearly'")
+    price = 4.99 if plan == "monthly" else 49.99
+    await db.users.update_one({"id": user["id"]}, {"$set": {"tier": "premium", "plan": plan, "plan_price": price}})
+    return {"tier": "premium", "plan": plan, "price": price, "message": "Upgraded (MOCKED — Stripe integration deferred)"}
 
 
 # ---------- Startup ----------
