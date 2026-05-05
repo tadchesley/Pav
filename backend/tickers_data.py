@@ -227,5 +227,15 @@ for t in TICKERS:
         _unique.append(t)
 TICKERS = _unique
 
+# Merge in additional tickers (crypto, indices, FX, more S&P 500, ETFs, etc.)
+try:
+    from extra_tickers import EXTRA_TICKERS
+    for t in EXTRA_TICKERS:
+        if t[0] not in _seen:
+            _seen.add(t[0])
+            TICKERS.append(t)
+except ImportError:
+    pass
+
 TICKERS_DICT = {t[0]: {"symbol": t[0], "name": t[1], "sector": t[2]} for t in TICKERS}
 TICKER_COUNT = len(TICKERS)

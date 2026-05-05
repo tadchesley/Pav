@@ -1,6 +1,45 @@
 # Pav — AI Stock Prediction App (PRD)
 
 ## Overview
+Mobile-first Expo + FastAPI + MongoDB app delivering AI-powered stock predictions across **871 tickers** (full S&P 500 + Russell 1000 mid-caps + popular small/meme stocks + 130 ETFs incl. leveraged + 36 crypto pairs + 15 indices + 20 FX pairs + 15 commodity futures). Combines real Finnhub stock prices, real Yahoo Finance data for crypto/indices/FX, statistical indicators (RSI, SMA, momentum, volatility), and Claude Sonnet 4.5 reasoning via the Emergent Universal LLM Key.
+
+## Tech stack
+- Frontend: React Native (Expo Router SDK 54), TypeScript, react-native-svg, AsyncStorage, axios
+- Backend: FastAPI, Motor (MongoDB), httpx (Finnhub), yfinance, bcrypt + JWT, emergentintegrations
+- **Live data sourcing waterfall**: Finnhub (primary, key set in .env) → yfinance (crypto/FX/indices/commodities) → deterministic mock fallback
+
+## Brand
+- App name: **Pav** — "The pulse of the market."
+- Splash: 88px wordmark with entrance fade+spring + heartbeat-pulsing dot, 1.8s minimum
+
+## Universe breakdown (871 tickers)
+- Stocks: ~580 (full S&P 500 + Russell 1000 mid-caps + meme stocks + international ADRs)
+- ETFs: 130 (broad-market, sector, leveraged 3X, thematic, commodity, bond)
+- Crypto: 36 (BTC, ETH, SOL, XRP, ADA, DOGE, AVAX, DOT, MATIC, LINK, etc + meme coins like SHIB, PEPE, WIF, BONK)
+- Indices: 15 (^GSPC, ^DJI, ^IXIC, ^VIX, ^FTSE, ^N225, etc)
+- FX: 20 pairs (EURUSD=X, GBPUSD=X, USDJPY=X, etc)
+- Commodities: 15 futures (Gold GC=F, Silver SI=F, Oil CL=F, Brent BZ=F, etc)
+
+## Core endpoints
+- `/api/auth/{signup,login,social,me,theme}`
+- `/api/stocks/{universe,search,quote/{symbol},candles/{symbol}}`
+- `/api/predictions/{symbol}`, `/api/predictions/top/movers`, `/api/predictions/screener`
+- `/api/watchlist`, `/api/alerts` (CRUD)
+- `/api/subscription/upgrade` accepts `{plan: "monthly"|"yearly"}` (MOCKED Stripe)
+
+## Verified live integrations
+- Finnhub: AAPL $282.87 real-time ✅
+- yfinance: BTC-USD $81,310 real-time ✅
+
+## Mocked / deferred
+- Stripe checkout
+- Google/Apple OAuth ID-token verification
+
+## Smart business enhancement
+Free vs Premium: $4.99/mo or $49.99/yr (17% savings). Free tier limited to 15 watchlist symbols + weekly predictions; Premium = unlimited + real-time + advanced screener.
+
+
+## Overview
 Mobile-first Expo + FastAPI + MongoDB app delivering AI-powered stock predictions across **418 tickers** (S&P 500 highlights + NASDAQ 100 + Dow 30 + 40 popular ETFs). Combines real Yahoo Finance prices, statistical indicators (RSI, SMA, momentum, volatility), and Claude Sonnet 4.5 reasoning via the Emergent Universal LLM Key.
 
 ## Tech stack
