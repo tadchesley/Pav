@@ -67,8 +67,8 @@ export default function AuthScreen() {
           />
           <View style={[s.heroOverlay, { backgroundColor: theme.background + 'CC' }]} />
           <View style={s.heroContent}>
-            <Text style={[s.brand, { color: theme.textPrimary }]}>AlphaPulse</Text>
-            <Text style={[s.tagline, { color: theme.textSecondary }]}>AI-driven market forecasts.{'\n'}Confidence-ranked.</Text>
+            <Text style={[s.brand, { color: theme.textPrimary }]}>Pav</Text>
+            <Text style={[s.tagline, { color: theme.textSecondary }]}>The pulse of the market.{'\n'}AI-driven forecasts, confidence-ranked.</Text>
           </View>
         </View>
 

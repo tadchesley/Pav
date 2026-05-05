@@ -81,7 +81,7 @@ export default function Settings() {
         <Text style={[s.sectionTitle, { color: theme.textSecondary }]}>ABOUT</Text>
         <View style={[s.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 18 }}>
-            AlphaPulse uses AI ensemble models (statistical indicators + Claude Sonnet 4.5 reasoning) trained on historical market data.
+            Pav uses AI ensemble models (statistical indicators + Claude Sonnet 4.5 reasoning + real Yahoo Finance data) trained on historical market data.
             Predictions carry inherent uncertainty. <Text style={{ color: theme.textPrimary, fontWeight: '600' }}>This is not financial advice.</Text> Always do your own research.
           </Text>
         </View>
@@ -101,7 +101,7 @@ export default function Settings() {
               <Ionicons name="close" size={28} color="#FAFAFA" />
             </TouchableOpacity>
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={{ color: '#FAFAFA', fontSize: 14, letterSpacing: 2, marginBottom: 8, marginTop: 20 }}>ALPHAPULSE PREMIUM</Text>
+              <Text style={{ color: '#FAFAFA', fontSize: 14, letterSpacing: 2, marginBottom: 8, marginTop: 20 }}>PAV PREMIUM</Text>
               <Text style={{ color: '#FAFAFA', fontSize: 40, fontWeight: '700', letterSpacing: -1.5, marginBottom: 20 }}>Unlock AI Alpha</Text>
               {['Unlimited stocks tracked', 'Real-time AI predictions', 'Advanced screener filters', 'API access for algorithms', 'Regime change alerts'].map((f) => (
                 <View key={f} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>

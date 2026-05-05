@@ -10,6 +10,7 @@ from typing import List, Optional, Dict, Any
 
 import httpx
 import bcrypt
+import yfinance as yf
 from jose import jwt, JWTError
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -17,6 +18,8 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
 from dotenv import load_dotenv
+
+from tickers_data import TICKERS, TICKERS_DICT, TICKER_COUNT
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -116,74 +119,84 @@ async def current_user(cred: HTTPAuthorizationCredentials = Depends(security)):
 # ---------- Finnhub service ----------
 FINNHUB_BASE = "https://finnhub.io/api/v1"
 
-# Fallback seed data for demo when no Finnhub key is configured
-SEED_TICKERS = [
-    # Technology
-    {"symbol": "AAPL", "name": "Apple Inc.", "sector": "Technology", "price": 189.50, "market_cap": 2950000000000},
-    {"symbol": "MSFT", "name": "Microsoft Corp.", "sector": "Technology", "price": 421.30, "market_cap": 3130000000000},
-    {"symbol": "GOOGL", "name": "Alphabet Inc.", "sector": "Technology", "price": 172.15, "market_cap": 2120000000000},
-    {"symbol": "NVDA", "name": "NVIDIA Corp.", "sector": "Technology", "price": 875.40, "market_cap": 2160000000000},
-    {"symbol": "AMD", "name": "Advanced Micro Devices", "sector": "Technology", "price": 168.70, "market_cap": 273000000000},
-    {"symbol": "ORCL", "name": "Oracle Corp.", "sector": "Technology", "price": 142.30, "market_cap": 395000000000},
-    {"symbol": "CRM", "name": "Salesforce Inc.", "sector": "Technology", "price": 275.80, "market_cap": 268000000000},
-    {"symbol": "ADBE", "name": "Adobe Inc.", "sector": "Technology", "price": 518.20, "market_cap": 231000000000},
-    {"symbol": "INTC", "name": "Intel Corp.", "sector": "Technology", "price": 31.40, "market_cap": 133000000000},
-    {"symbol": "CSCO", "name": "Cisco Systems", "sector": "Technology", "price": 58.10, "market_cap": 235000000000},
-    {"symbol": "IBM", "name": "IBM Corp.", "sector": "Technology", "price": 212.50, "market_cap": 196000000000},
-    {"symbol": "QCOM", "name": "Qualcomm Inc.", "sector": "Technology", "price": 172.40, "market_cap": 191000000000},
-    # Consumer Cyclical
-    {"symbol": "AMZN", "name": "Amazon.com Inc.", "sector": "Consumer Cyclical", "price": 188.20, "market_cap": 1950000000000},
-    {"symbol": "TSLA", "name": "Tesla Inc.", "sector": "Consumer Cyclical", "price": 248.30, "market_cap": 789000000000},
-    {"symbol": "HD", "name": "Home Depot", "sector": "Consumer Cyclical", "price": 382.10, "market_cap": 380000000000},
-    {"symbol": "NKE", "name": "Nike Inc.", "sector": "Consumer Cyclical", "price": 78.40, "market_cap": 117000000000},
-    {"symbol": "MCD", "name": "McDonald's Corp.", "sector": "Consumer Cyclical", "price": 289.60, "market_cap": 207000000000},
-    {"symbol": "SBUX", "name": "Starbucks Corp.", "sector": "Consumer Cyclical", "price": 94.20, "market_cap": 107000000000},
-    {"symbol": "LOW", "name": "Lowe's Companies", "sector": "Consumer Cyclical", "price": 242.80, "market_cap": 138000000000},
-    {"symbol": "TGT", "name": "Target Corp.", "sector": "Consumer Cyclical", "price": 141.30, "market_cap": 65000000000},
-    # Communication Services
-    {"symbol": "META", "name": "Meta Platforms Inc.", "sector": "Communication Services", "price": 497.80, "market_cap": 1270000000000},
-    {"symbol": "NFLX", "name": "Netflix Inc.", "sector": "Communication Services", "price": 641.20, "market_cap": 278000000000},
-    {"symbol": "DIS", "name": "Walt Disney Co.", "sector": "Communication Services", "price": 112.60, "market_cap": 205000000000},
-    {"symbol": "T", "name": "AT&T Inc.", "sector": "Communication Services", "price": 21.80, "market_cap": 156000000000},
-    {"symbol": "VZ", "name": "Verizon Communications", "sector": "Communication Services", "price": 41.20, "market_cap": 173000000000},
-    {"symbol": "CMCSA", "name": "Comcast Corp.", "sector": "Communication Services", "price": 42.50, "market_cap": 168000000000},
-    # Financial Services
-    {"symbol": "BRK.B", "name": "Berkshire Hathaway", "sector": "Financial Services", "price": 412.10, "market_cap": 895000000000},
-    {"symbol": "JPM", "name": "JPMorgan Chase", "sector": "Financial Services", "price": 198.70, "market_cap": 568000000000},
-    {"symbol": "V", "name": "Visa Inc.", "sector": "Financial Services", "price": 276.50, "market_cap": 558000000000},
-    {"symbol": "MA", "name": "Mastercard Inc.", "sector": "Financial Services", "price": 458.30, "market_cap": 428000000000},
-    {"symbol": "BAC", "name": "Bank of America", "sector": "Financial Services", "price": 38.90, "market_cap": 301000000000},
-    {"symbol": "WFC", "name": "Wells Fargo & Co.", "sector": "Financial Services", "price": 58.70, "market_cap": 210000000000},
-    {"symbol": "GS", "name": "Goldman Sachs", "sector": "Financial Services", "price": 478.20, "market_cap": 153000000000},
-    {"symbol": "MS", "name": "Morgan Stanley", "sector": "Financial Services", "price": 101.40, "market_cap": 163000000000},
-    # Healthcare
-    {"symbol": "JNJ", "name": "Johnson & Johnson", "sector": "Healthcare", "price": 156.20, "market_cap": 376000000000},
-    {"symbol": "UNH", "name": "UnitedHealth Group", "sector": "Healthcare", "price": 524.80, "market_cap": 484000000000},
-    {"symbol": "LLY", "name": "Eli Lilly & Co.", "sector": "Healthcare", "price": 782.40, "market_cap": 744000000000},
-    {"symbol": "PFE", "name": "Pfizer Inc.", "sector": "Healthcare", "price": 27.80, "market_cap": 158000000000},
-    {"symbol": "ABBV", "name": "AbbVie Inc.", "sector": "Healthcare", "price": 178.50, "market_cap": 315000000000},
-    {"symbol": "MRK", "name": "Merck & Co.", "sector": "Healthcare", "price": 124.30, "market_cap": 315000000000},
-    {"symbol": "TMO", "name": "Thermo Fisher Scientific", "sector": "Healthcare", "price": 558.20, "market_cap": 214000000000},
-    # Consumer Defensive
-    {"symbol": "WMT", "name": "Walmart Inc.", "sector": "Consumer Defensive", "price": 62.40, "market_cap": 502000000000},
-    {"symbol": "PG", "name": "Procter & Gamble", "sector": "Consumer Defensive", "price": 166.30, "market_cap": 391000000000},
-    {"symbol": "KO", "name": "Coca-Cola Co.", "sector": "Consumer Defensive", "price": 63.20, "market_cap": 272000000000},
-    {"symbol": "PEP", "name": "PepsiCo Inc.", "sector": "Consumer Defensive", "price": 171.80, "market_cap": 236000000000},
-    {"symbol": "COST", "name": "Costco Wholesale", "sector": "Consumer Defensive", "price": 842.50, "market_cap": 373000000000},
-    # Energy
-    {"symbol": "XOM", "name": "Exxon Mobil", "sector": "Energy", "price": 118.40, "market_cap": 471000000000},
-    {"symbol": "CVX", "name": "Chevron Corp.", "sector": "Energy", "price": 158.60, "market_cap": 294000000000},
-    {"symbol": "COP", "name": "ConocoPhillips", "sector": "Energy", "price": 112.30, "market_cap": 132000000000},
-    {"symbol": "SLB", "name": "Schlumberger", "sector": "Energy", "price": 48.20, "market_cap": 68000000000},
-    # Industrials
-    {"symbol": "BA", "name": "Boeing Co.", "sector": "Industrials", "price": 176.80, "market_cap": 108000000000},
-    {"symbol": "CAT", "name": "Caterpillar Inc.", "sector": "Industrials", "price": 342.70, "market_cap": 170000000000},
-    {"symbol": "GE", "name": "General Electric", "sector": "Industrials", "price": 168.40, "market_cap": 183000000000},
-    {"symbol": "UPS", "name": "United Parcel Service", "sector": "Industrials", "price": 138.60, "market_cap": 118000000000},
+# Top 100 by market cap (curated mega-caps + popular liquid names) — used for screener/dashboard pre-computed predictions
+SCREENER_UNIVERSE_SYMBOLS = [
+    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "BRK.B", "AVGO", "LLY",
+    "JPM", "V", "XOM", "UNH", "MA", "PG", "JNJ", "HD", "COST", "ORCL",
+    "ABBV", "BAC", "CVX", "MRK", "KO", "WMT", "NFLX", "CRM", "AMD", "PEP",
+    "TMO", "LIN", "ADBE", "CSCO", "WFC", "MCD", "ACN", "ABT", "DIS", "DHR",
+    "VZ", "INTC", "QCOM", "CAT", "TXN", "PFE", "INTU", "AMGN", "AMAT", "MS",
+    "IBM", "NEE", "GS", "RTX", "UNP", "HON", "LOW", "PM", "COP", "UPS",
+    "BKNG", "GE", "AXP", "SPGI", "ELV", "ISRG", "CMCSA", "MDT", "LMT", "NOW",
+    "PLD", "T", "BA", "BLK", "DE", "SCHW", "SBUX", "ADI", "GILD", "MDLZ",
+    "TSM", "ASML", "BABA", "NVO", "SHEL", "TM", "BHP", "AZN", "NVS", "UL",
+    "SPY", "QQQ", "VOO", "IVV", "VTI", "DIA", "IWM", "GLD", "TLT", "XLK",
 ]
 
-SEED_BY_SYMBOL = {t["symbol"]: t for t in SEED_TICKERS}
+# Use ticker list as the primary ticker source
+SEED_BY_SYMBOL = TICKERS_DICT
 
+
+# yfinance cache (in-memory, 60s TTL)
+_yf_cache: dict = {}
+_yf_cache_ttl = 60  # seconds
+
+
+def yf_quote(symbol: str) -> Optional[dict]:
+    """Fetch real quote from Yahoo Finance via yfinance. Cached 60s."""
+    now = datetime.now(timezone.utc).timestamp()
+    cached = _yf_cache.get(symbol)
+    if cached and now - cached["ts"] < _yf_cache_ttl:
+        return cached["data"]
+    try:
+        t = yf.Ticker(symbol)
+        info = t.fast_info
+        price = float(info.get("last_price") or 0) or float(info.get("lastPrice") or 0) or 0
+        prev = float(info.get("previous_close") or 0) or float(info.get("previousClose") or 0) or 0
+        if price <= 0:
+            return None
+        change = price - prev if prev > 0 else 0
+        data = {
+            "c": round(price, 2),
+            "d": round(change, 2),
+            "dp": round((change / prev) * 100, 2) if prev > 0 else 0,
+            "h": round(float(info.get("day_high") or info.get("dayHigh") or price), 2),
+            "l": round(float(info.get("day_low") or info.get("dayLow") or price), 2),
+            "o": round(float(info.get("open") or price - change * 0.3), 2),
+            "pc": round(prev, 2),
+            "t": int(now),
+        }
+        _yf_cache[symbol] = {"ts": now, "data": data}
+        return data
+    except Exception as e:
+        logger.debug(f"yfinance quote failed for {symbol}: {e}")
+        return None
+
+
+def yf_candles(symbol: str, days: int = 90) -> Optional[dict]:
+    """Fetch historical OHLCV from Yahoo Finance."""
+    try:
+        t = yf.Ticker(symbol)
+        period = "1y" if days > 90 else ("6mo" if days > 60 else "3mo")
+        hist = t.history(period=period, interval="1d")
+        if hist is None or hist.empty:
+            return None
+        hist = hist.tail(days)
+        return {
+            "c": [round(float(x), 2) for x in hist["Close"].tolist()],
+            "o": [round(float(x), 2) for x in hist["Open"].tolist()],
+            "h": [round(float(x), 2) for x in hist["High"].tolist()],
+            "l": [round(float(x), 2) for x in hist["Low"].tolist()],
+            "v": [int(x) for x in hist["Volume"].tolist()],
+            "t": [int(ts.timestamp()) for ts in hist.index],
+            "s": "ok",
+        }
+    except Exception as e:
+        logger.debug(f"yfinance candles failed for {symbol}: {e}")
+        return None
+
+# Fallback seed data for demo when no Finnhub key is configured
+# (Old SEED_TICKERS list removed — now sourced from tickers_data.TICKERS)
 
 async def finnhub_get(path: str, params: dict) -> Optional[dict]:
     if not FINNHUB_API_KEY:
@@ -199,12 +212,17 @@ async def finnhub_get(path: str, params: dict) -> Optional[dict]:
     return None
 
 
+# Hash-based deterministic price for unknown tickers (last-resort fallback)
+def _seed_price_for(symbol: str) -> float:
+    h = abs(hash(symbol)) % 100000
+    return 20 + (h % 800)  # $20-$820 range
+
+
 def mock_quote(symbol: str) -> dict:
-    base = SEED_BY_SYMBOL.get(symbol, {"price": 100.0})
-    # Deterministic daily jitter based on symbol + date
+    base_price = _seed_price_for(symbol)
     seed = hash(symbol + datetime.now(timezone.utc).strftime("%Y-%m-%d")) % 10000
     rng = random.Random(seed)
-    price = base["price"] * (1 + rng.uniform(-0.02, 0.02))
+    price = base_price * (1 + rng.uniform(-0.02, 0.02))
     change = price * rng.uniform(-0.03, 0.03)
     return {
         "c": round(price, 2),
@@ -219,7 +237,7 @@ def mock_quote(symbol: str) -> dict:
 
 
 def mock_candles(symbol: str, days: int = 90) -> dict:
-    base = SEED_BY_SYMBOL.get(symbol, {"price": 100.0})["price"]
+    base = _seed_price_for(symbol)
     rng = random.Random(hash(symbol) % 10000)
     price = base * 0.92
     closes, opens, highs, lows, vols, ts = [], [], [], [], [], []
@@ -240,18 +258,26 @@ def mock_candles(symbol: str, days: int = 90) -> dict:
 
 
 async def get_quote(symbol: str) -> dict:
+    """Order: Finnhub (if key) → yfinance (real) → mock fallback."""
     data = await finnhub_get("quote", {"symbol": symbol})
     if data and data.get("c"):
         return data
+    yf_data = await asyncio.to_thread(yf_quote, symbol)
+    if yf_data:
+        return yf_data
     return mock_quote(symbol)
 
 
 async def get_candles(symbol: str, days: int = 90) -> dict:
+    """Order: Finnhub (if key) → yfinance (real) → mock fallback."""
     to_ts = int(datetime.now(timezone.utc).timestamp())
     from_ts = to_ts - days * 86400
     data = await finnhub_get("stock/candle", {"symbol": symbol, "resolution": "D", "from": from_ts, "to": to_ts})
     if data and data.get("s") == "ok":
         return data
+    yf_data = await asyncio.to_thread(yf_candles, symbol, days)
+    if yf_data:
+        return yf_data
     return mock_candles(symbol, days)
 
 
@@ -491,31 +517,36 @@ async def update_theme(body: dict, user=Depends(current_user)):
 # ---------- Stock routes ----------
 @api.get("/stocks/universe")
 async def get_universe():
-    return {"stocks": SEED_TICKERS}
+    return {"stocks": list(TICKERS_DICT.values()), "count": TICKER_COUNT}
 
 
 @api.get("/stocks/search")
 async def search_stocks(q: str):
-    q = q.upper()
-    data = await finnhub_get("search", {"q": q})
+    q_upper = q.upper()
+    q_lower = q.lower()
+    # First try Finnhub for global search
+    data = await finnhub_get("search", {"q": q_upper})
     if data and data.get("result"):
         return {"results": [
             {"symbol": r["symbol"], "description": r.get("description", ""), "type": r.get("type", "")}
-            for r in data["result"][:10]
+            for r in data["result"][:15]
         ]}
-    # fallback filter
-    results = [
-        {"symbol": t["symbol"], "description": t["name"], "type": "Common Stock"}
-        for t in SEED_TICKERS if q in t["symbol"] or q.lower() in t["name"].lower()
-    ]
-    return {"results": results[:10]}
+    # Fallback: filter our embedded ticker list
+    results = []
+    for t in TICKERS:
+        sym, name, _ = t
+        if q_upper in sym or q_lower in name.lower():
+            results.append({"symbol": sym, "description": name, "type": "Common Stock"})
+            if len(results) >= 15:
+                break
+    return {"results": results}
 
 
 @api.get("/stocks/quote/{symbol}")
 async def quote(symbol: str):
     symbol = symbol.upper()
     q = await get_quote(symbol)
-    seed = SEED_BY_SYMBOL.get(symbol, {})
+    seed = TICKERS_DICT.get(symbol, {})
     return {
         "symbol": symbol,
         "name": seed.get("name", symbol),
@@ -554,7 +585,7 @@ async def build_prediction(symbol: str, use_llm: bool) -> dict:
         indicators["current"] = quote_data.get("c", 0)
     stat_pred = statistical_prediction(symbol, indicators, candle_data)
 
-    profile = SEED_BY_SYMBOL.get(symbol, {"name": symbol, "sector": "Unknown"})
+    profile = TICKERS_DICT.get(symbol, {"name": symbol, "sector": "Unknown"})
 
     narrative_data = await llm_analysis(symbol, indicators, stat_pred, profile) if use_llm else {
         "narrative": f"Quick statistical signal: {stat_pred['direction']} with {int(stat_pred['confidence']*100)}% confidence.",
@@ -595,13 +626,12 @@ async def prediction(symbol: str, deep: bool = True, user=Depends(current_user))
 
 @api.get("/predictions/top/movers")
 async def top_movers(user=Depends(current_user)):
-    """Top predicted gainers and losers (statistical only for speed)."""
-    tasks = [build_prediction(t["symbol"], use_llm=False) for t in SEED_TICKERS]
+    """Top predicted gainers and losers (statistical only for speed) — top 100 universe."""
+    tasks = [build_prediction(s, use_llm=False) for s in SCREENER_UNIVERSE_SYMBOLS]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     valid = [r for r in results if isinstance(r, dict)]
     gainers = sorted(valid, key=lambda x: -x["ai_score"])[:5]
     losers = sorted(valid, key=lambda x: x["ai_score"])[:5]
-    # market sentiment = avg score
     sentiment_score = round(sum(r["ai_score"] for r in valid) / len(valid), 1) if valid else 50
     return {
         "gainers": [{k: v for k, v in g.items() if k not in ("indicators", "narrative", "key_factors", "risks", "feature_importance")} for g in gainers],
@@ -615,10 +645,10 @@ async def top_movers(user=Depends(current_user)):
 async def screener(body: dict, user=Depends(current_user)):
     min_conf = body.get("min_confidence", 0)
     min_return = body.get("min_return", -100)
-    direction = body.get("direction")  # UP, DOWN, NEUTRAL, or None
+    direction = body.get("direction")
     sector = body.get("sector")
 
-    tasks = [build_prediction(t["symbol"], use_llm=False) for t in SEED_TICKERS]
+    tasks = [build_prediction(s, use_llm=False) for s in SCREENER_UNIVERSE_SYMBOLS]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     out = []
     for r in results:
