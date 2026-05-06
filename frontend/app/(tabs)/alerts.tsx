@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/api';
 import { useTheme } from '../../src/ThemeContext';
+import { processAlertsForNotifications, ensureNotificationPermission } from '../../src/notifications';
 
 export default function Alerts() {
   const { theme } = useTheme();
@@ -19,10 +20,18 @@ export default function Alerts() {
     try {
       const { data } = await api.get('/alerts');
       setItems(data.items);
+      // Fire local notifications for newly-triggered alerts
+      processAlertsForNotifications(data.items).catch(() => {});
     } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    ensureNotificationPermission().catch(() => {});
+    // Poll alerts every 30s while alerts page is mounted to catch triggers
+    const id = setInterval(() => load(), 30000);
+    return () => clearInterval(id);
+  }, [load]);
 
   const create = async () => {
     if (!symbol || !target) { Alert.alert('Missing', 'Enter symbol and price'); return; }

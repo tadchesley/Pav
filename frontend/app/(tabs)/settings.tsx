@@ -71,6 +71,19 @@ export default function Settings() {
           </TouchableOpacity>
         )}
 
+        <Text style={[s.sectionTitle, { color: theme.textSecondary }]}>NOTIFICATIONS</Text>
+        <View style={[s.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+            <Ionicons name="notifications" size={20} color={theme.textPrimary} style={{ marginTop: 2 }} />
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={{ color: theme.textPrimary, fontWeight: '600' }}>Alert notifications</Text>
+              <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 4, lineHeight: 18 }}>
+                Pav sends a banner notification when a price alert triggers. Manage permissions, sound, and lock-screen visibility in your phone's <Text style={{ color: theme.textPrimary, fontWeight: '600' }}>System Settings → Notifications → Pav</Text>.
+              </Text>
+            </View>
+          </View>
+        </View>
+
         <Text style={[s.sectionTitle, { color: theme.textSecondary }]}>APPEARANCE</Text>
         <View style={[s.card, { backgroundColor: theme.surface, borderColor: theme.border, flexDirection: 'row', alignItems: 'center' }]}>
           <Ionicons name={mode === 'dark' ? 'moon' : 'sunny'} size={20} color={theme.textPrimary} />
@@ -103,10 +116,20 @@ export default function Settings() {
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={{ color: '#FAFAFA', fontSize: 14, letterSpacing: 2, marginBottom: 8, marginTop: 20 }}>PAV PREMIUM</Text>
               <Text style={{ color: '#FAFAFA', fontSize: 40, fontWeight: '700', letterSpacing: -1.5, marginBottom: 20 }}>Unlock AI Alpha</Text>
-              {['Unlimited stocks tracked', 'Real-time AI predictions', 'Advanced screener filters', 'API access for algorithms', 'Regime change alerts'].map((f) => (
-                <View key={f} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                  <Ionicons name="checkmark-circle" size={20} color="#22C55E" />
-                  <Text style={{ color: '#FAFAFA', marginLeft: 12, fontSize: 16 }}>{f}</Text>
+              {[
+                'Unlimited watchlist symbols (free: 15)',
+                'AI-narrative predictions with Claude Sonnet 4.5',
+                'Real-time Finnhub quotes (free: end-of-day)',
+                'Unlimited alerts + AI confidence triggers',
+                'Advanced screener filters & confidence ≥75%',
+                '1-year price history (free: 7 days)',
+                'Multi-horizon forecasts: 1D / 1W / 1M',
+                'Compare up to 4 stocks side-by-side',
+                'Export predictions to CSV',
+              ].map((f) => (
+                <View key={f} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 }}>
+                  <Ionicons name="checkmark-circle" size={20} color="#22C55E" style={{ marginTop: 2 }} />
+                  <Text style={{ color: '#FAFAFA', marginLeft: 12, fontSize: 15, flex: 1 }}>{f}</Text>
                 </View>
               ))}
 

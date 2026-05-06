@@ -74,15 +74,17 @@ export default function Dashboard() {
         </View>
 
         <View style={[s.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[s.cardLabel, { color: theme.textSecondary }]}>MARKET SENTIMENT</Text>
-          <View style={{ alignItems: 'center', marginVertical: 8 }}>
-            <Gauge value={data?.market_sentiment ?? 50} theme={theme} size={160} />
-          </View>
-          <View style={{ alignItems: 'center' }}>
-            <Text style={[s.sentimentScore, { color: theme.textPrimary }]}>{(data?.market_sentiment ?? 50).toFixed(0)}</Text>
-            <Text style={[s.sentimentLabel, { color: data?.sentiment_label === 'Bullish' ? theme.bullish : data?.sentiment_label === 'Bearish' ? theme.bearish : theme.neutral }]}>
-              {data?.sentiment_label ?? 'Neutral'}
-            </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.cardLabel, { color: theme.textSecondary }]}>MARKET SENTIMENT</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 8 }}>
+                <Text style={[s.sentimentScore, { color: theme.textPrimary }]}>{(data?.market_sentiment ?? 50).toFixed(0)}</Text>
+                <Text style={[s.sentimentLabel, { color: data?.sentiment_label === 'Bullish' ? theme.bullish : data?.sentiment_label === 'Bearish' ? theme.bearish : theme.neutral, marginLeft: 10 }]}>
+                  {data?.sentiment_label ?? 'Neutral'}
+                </Text>
+              </View>
+            </View>
+            <Gauge value={data?.market_sentiment ?? 50} theme={theme} size={92} />
           </View>
         </View>
 
@@ -187,8 +189,8 @@ const styles = (t: any) => StyleSheet.create({
   greeting: { fontSize: 14 },
   name: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5, marginTop: 4 },
   searchBtn: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  card: { marginHorizontal: 16, padding: 20, borderRadius: 16, borderWidth: 1 },
+  card: { marginHorizontal: 16, padding: 16, borderRadius: 14, borderWidth: 1 },
   cardLabel: { fontSize: 11, letterSpacing: 1.2, fontWeight: '600' },
-  sentimentScore: { fontSize: 24, fontWeight: '700', letterSpacing: -0.5 },
-  sentimentLabel: { fontSize: 14, fontWeight: '600', marginTop: 4 },
+  sentimentScore: { fontSize: 32, fontWeight: '700', letterSpacing: -1 },
+  sentimentLabel: { fontSize: 14, fontWeight: '600' },
 });

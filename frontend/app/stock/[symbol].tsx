@@ -97,17 +97,19 @@ export default function StockDetail() {
           </View>
         )}
 
-        <View style={[s.aiCard, { backgroundColor: theme.surface, borderColor: theme.border, borderLeftColor: theme.neutral }]}>
-          <Text style={[s.cardLabel, { color: theme.textSecondary }]}>AI PREDICTION · {pred.horizon_days} DAYS</Text>
-          <View style={{ flexDirection: 'row', marginTop: 10, gap: 12 }}>
-            <Stat label="Score" value={pred.ai_score.toFixed(0)} color={color} theme={theme} />
-            <Stat label="Direction" value={pred.direction} color={color} theme={theme} />
-            <Stat label="Confidence" value={`${(pred.confidence * 100).toFixed(0)}%`} color={theme.textPrimary} theme={theme} />
+        {pred.narrative && (
+          <View style={[s.aiCard, { backgroundColor: theme.surface, borderColor: theme.border, borderLeftColor: (pred as any).premium_required ? '#F59E0B' : theme.neutral }]}>
+            <Text style={[s.cardLabel, { color: theme.textSecondary }]}>
+              {(pred as any).premium_required ? 'PREMIUM PREVIEW' : 'AI NARRATIVE'}
+            </Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 14, lineHeight: 21, marginTop: 12 }}>{pred.narrative}</Text>
+            {(pred as any).premium_required && (
+              <TouchableOpacity testID="btn-upgrade-from-stock" onPress={() => router.push('/(tabs)/settings')} style={{ marginTop: 14, backgroundColor: '#F59E0B', paddingVertical: 12, borderRadius: 999, alignItems: 'center' }}>
+                <Text style={{ color: '#09090B', fontWeight: '700' }}>Unlock with Premium</Text>
+              </TouchableOpacity>
+            )}
           </View>
-          {pred.narrative && (
-            <Text style={{ color: theme.textSecondary, fontSize: 14, lineHeight: 21, marginTop: 16 }}>{pred.narrative}</Text>
-          )}
-        </View>
+        )}
 
         {pred.feature_importance && Object.keys(pred.feature_importance).length > 0 && (
           <View style={[s.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>

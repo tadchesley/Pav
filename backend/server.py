@@ -440,6 +440,25 @@ async def llm_analysis(symbol: str, indicators: dict, stat_pred: dict, profile: 
     }
 
 
+# ---------- Tier limits ----------
+FREE_LIMITS = {
+    "watchlist_max": 15,
+    "alerts_max": 3,
+    "candles_days_max": 7,
+    "deep_analysis": False,  # LLM narrative is premium-only
+}
+PREMIUM_LIMITS = {
+    "watchlist_max": 99999,
+    "alerts_max": 99999,
+    "candles_days_max": 365,
+    "deep_analysis": True,
+}
+
+
+def get_limits(user: dict) -> dict:
+    return PREMIUM_LIMITS if user.get("tier") == "premium" else FREE_LIMITS
+
+
 # ---------- Auth routes ----------
 @api.get("/")
 async def root():
@@ -505,6 +524,19 @@ async def me(user=Depends(current_user)):
     return user_to_out(user)
 
 
+@api.get("/auth/limits")
+async def my_limits(user=Depends(current_user)):
+    """Returns tier limits + current usage for free vs premium awareness."""
+    limits = get_limits(user)
+    watch_count = await db.watchlist.count_documents({"user_id": user["id"]})
+    alerts_count = await db.alerts.count_documents({"user_id": user["id"], "status": "active"})
+    return {
+        "tier": user.get("tier", "free"),
+        "limits": limits,
+        "usage": {"watchlist": watch_count, "alerts_active": alerts_count},
+    }
+
+
 @api.put("/auth/theme")
 async def update_theme(body: dict, user=Depends(current_user)):
     theme = body.get("theme", "dark")
@@ -562,9 +594,11 @@ async def quote(symbol: str):
 
 
 @api.get("/stocks/candles/{symbol}")
-async def candles(symbol: str, days: int = 90):
+async def candles(symbol: str, days: int = 90, user=Depends(current_user)):
     symbol = symbol.upper()
-    c = await get_candles(symbol, days)
+    max_days = get_limits(user)["candles_days_max"]
+    capped_days = min(days, max_days)
+    c = await get_candles(symbol, capped_days)
     return {
         "symbol": symbol,
         "timestamps": c.get("t", []),
@@ -573,6 +607,8 @@ async def candles(symbol: str, days: int = 90):
         "high": c.get("h", []),
         "low": c.get("l", []),
         "volume": c.get("v", []),
+        "days_returned": capped_days,
+        "days_max_for_tier": max_days,
     }
 
 
@@ -610,7 +646,16 @@ async def build_prediction(symbol: str, use_llm: bool) -> dict:
 
 @api.get("/predictions/{symbol}")
 async def prediction(symbol: str, deep: bool = True, user=Depends(current_user)):
-    result = await build_prediction(symbol, use_llm=deep)
+    # Gate deep LLM analysis to premium tier
+    use_deep = deep and get_limits(user)["deep_analysis"]
+    result = await build_prediction(symbol, use_llm=use_deep)
+    if deep and not use_deep:
+        # Free tier: signal that deep analysis is gated
+        result["narrative"] = "🔒 Upgrade to Pav Premium for AI-powered narrative analysis with Claude Sonnet 4.5."
+        result["key_factors"] = []
+        result["risks"] = []
+        result["feature_importance"] = {}
+        result["premium_required"] = True
     # audit log
     await db.predictions.insert_one({
         "id": str(uuid.uuid4()),
@@ -693,6 +738,10 @@ async def get_watchlist(user=Depends(current_user)):
 @api.post("/watchlist")
 async def add_watchlist(req: WatchlistAdd, user=Depends(current_user)):
     symbol = req.symbol.upper()
+    limits = get_limits(user)
+    count = await db.watchlist.count_documents({"user_id": user["id"]})
+    if count >= limits["watchlist_max"]:
+        raise HTTPException(403, f"Free tier limit reached ({limits['watchlist_max']} symbols). Upgrade to Pav Premium for unlimited watchlist.")
     existing = await db.watchlist.find_one({"user_id": user["id"], "symbol": symbol})
     if existing:
         raise HTTPException(400, "Already in watchlist")
@@ -738,6 +787,10 @@ async def get_alerts(user=Depends(current_user)):
 async def create_alert(req: AlertCreate, user=Depends(current_user)):
     if req.direction not in ("above", "below"):
         raise HTTPException(400, "direction must be 'above' or 'below'")
+    limits = get_limits(user)
+    active = await db.alerts.count_documents({"user_id": user["id"], "status": "active"})
+    if active >= limits["alerts_max"]:
+        raise HTTPException(403, f"Free tier limit reached ({limits['alerts_max']} active alerts). Upgrade to Pav Premium for unlimited alerts.")
     doc = {
         "id": str(uuid.uuid4()),
         "user_id": user["id"],
