@@ -1,6 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Alert, Modal, TextInput, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
+import Animated, { SharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/api';
 import { useTheme } from '../../src/ThemeContext';
@@ -20,7 +22,6 @@ export default function Alerts() {
     try {
       const { data } = await api.get('/alerts');
       setItems(data.items);
-      // Fire local notifications for newly-triggered alerts
       processAlertsForNotifications(data.items).catch(() => {});
     } finally { setLoading(false); }
   }, []);
@@ -28,7 +29,6 @@ export default function Alerts() {
   useEffect(() => {
     load();
     ensureNotificationPermission().catch(() => {});
-    // Poll alerts every 30s while alerts page is mounted to catch triggers
     const id = setInterval(() => load(), 30000);
     return () => clearInterval(id);
   }, [load]);
@@ -41,22 +41,37 @@ export default function Alerts() {
     } catch (e: any) { Alert.alert('Error', e?.response?.data?.detail || 'Failed'); }
   };
 
-  const remove = (id: string) => {
-    Alert.alert('Delete alert?', '', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => { await api.delete(`/alerts/${id}`); load(); } },
-    ]);
+  const swipeableRefs = useRef<Map<string, SwipeableMethods | null>>(new Map());
+
+  const confirmDelete = (id: string) => {
+    Alert.alert(
+      'Delete alert?',
+      'Are you sure you want to remove this alert?',
+      [
+        { text: 'Cancel', style: 'cancel', onPress: () => swipeableRefs.current.get(id)?.close() },
+        { text: 'Delete', style: 'destructive', onPress: async () => {
+          try { await api.delete(`/alerts/${id}`); load(); } catch {}
+        } },
+      ],
+    );
   };
 
-  const lastTapRef = React.useRef<{ id: string; time: number }>({ id: '', time: 0 });
-  const handleDoubleTap = (id: string) => {
-    const now = Date.now();
-    if (lastTapRef.current.id === id && now - lastTapRef.current.time < 350) {
-      lastTapRef.current = { id: '', time: 0 };
-      remove(id);
-    } else {
-      lastTapRef.current = { id, time: now };
-    }
+  const RightAction = ({ id, progress, drag }: { id: string; progress: SharedValue<number>; drag: SharedValue<number> }) => {
+    const animStyle = useAnimatedStyle(() => ({
+      transform: [{ translateX: drag.value + 96 }],
+    }));
+    return (
+      <Animated.View style={[{ width: 96 }, animStyle]}>
+        <TouchableOpacity
+          testID={`btn-trash-${id}`}
+          onPress={() => confirmDelete(id)}
+          activeOpacity={0.85}
+          style={s.trashAction}>
+          <Ionicons name="trash" size={22} color="#FFFFFF" />
+          <Text style={s.trashText}>Delete</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
   };
 
   const s = styles(theme);
@@ -91,26 +106,37 @@ export default function Alerts() {
               ? Math.min(1, item.current_price / item.target_price)
               : Math.min(1, item.target_price / Math.max(item.current_price, 0.01));
             return (
-              <TouchableOpacity testID={`alert-${item.id}`} activeOpacity={0.7} onPress={() => handleDoubleTap(item.id)} style={[s.row, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                  <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 16, flex: 1 }}>{item.symbol}</Text>
-                  {triggered ? (
-                    <View style={{ backgroundColor: theme.bullishBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-                      <Text style={{ color: theme.bullish, fontSize: 11, fontWeight: '700' }}>TRIGGERED</Text>
-                    </View>
-                  ) : (
-                    <Text style={{ color: theme.textTertiary, fontSize: 11 }}>Active</Text>
-                  )}
+              <ReanimatedSwipeable
+                ref={(ref) => { swipeableRefs.current.set(item.id, ref); }}
+                friction={2}
+                rightThreshold={40}
+                overshootRight={false}
+                renderRightActions={(prog, drag) => (
+                  <RightAction id={item.id} progress={prog} drag={drag} />
+                )}
+                containerStyle={{ marginBottom: 8 }}
+              >
+                <View style={[s.row, { borderColor: theme.border, backgroundColor: theme.surface }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                    <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 16, flex: 1 }}>{item.symbol}</Text>
+                    {triggered ? (
+                      <View style={{ backgroundColor: theme.bullishBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                        <Text style={{ color: theme.bullish, fontSize: 11, fontWeight: '700' }}>TRIGGERED</Text>
+                      </View>
+                    ) : (
+                      <Text style={{ color: theme.textTertiary, fontSize: 11 }}>Active</Text>
+                    )}
+                  </View>
+                  <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
+                    Notify when price goes <Text style={{ color: theme.textPrimary, fontWeight: '600' }}>{item.direction}</Text> ${item.target_price.toFixed(2)}
+                  </Text>
+                  <Text style={{ color: theme.textTertiary, fontSize: 11, marginTop: 4 }}>Current: ${item.current_price?.toFixed(2) || '—'}</Text>
+                  <View style={{ marginTop: 10, height: 4, backgroundColor: theme.border, borderRadius: 2, overflow: 'hidden' }}>
+                    <View style={{ width: `${progress * 100}%`, height: '100%', backgroundColor: triggered ? theme.bullish : theme.neutral }} />
+                  </View>
+                  <Text style={{ color: theme.textTertiary, fontSize: 10, marginTop: 6 }}>Swipe left to delete →</Text>
                 </View>
-                <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
-                  Notify when price goes <Text style={{ color: theme.textPrimary, fontWeight: '600' }}>{item.direction}</Text> ${item.target_price.toFixed(2)}
-                </Text>
-                <Text style={{ color: theme.textTertiary, fontSize: 11, marginTop: 4 }}>Current: ${item.current_price?.toFixed(2) || '—'}</Text>
-                <View style={{ marginTop: 10, height: 4, backgroundColor: theme.border, borderRadius: 2, overflow: 'hidden' }}>
-                  <View style={{ width: `${progress * 100}%`, height: '100%', backgroundColor: triggered ? theme.bullish : theme.neutral }} />
-                </View>
-                <Text style={{ color: theme.textTertiary, fontSize: 10, marginTop: 6 }}>Double-tap to delete</Text>
-              </TouchableOpacity>
+              </ReanimatedSwipeable>
             );
           }}
         />
@@ -153,5 +179,15 @@ const styles = (t: any) => StyleSheet.create({
   title: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
   subtitle: { fontSize: 13, marginTop: 4 },
   addBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  row: { padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 8 },
+  row: { padding: 14, borderRadius: 12, borderWidth: 1 },
+  trashAction: {
+    backgroundColor: '#DC2626',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flex: 1,
+    borderRadius: 12,
+    flexDirection: 'column',
+    marginLeft: 8,
+  },
+  trashText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700', marginTop: 4 },
 });
