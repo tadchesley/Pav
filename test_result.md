@@ -178,11 +178,11 @@ backend:
 
   - task: "Premium gating: screener filters + multi-horizon forecasts"
     implemented: true
-    working: false
+    working: true
     file: "/app/backend/server.py"
-    stuck_count: 1
+    stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         -working: "NA"
         -agent: "main"
@@ -348,7 +348,29 @@ agent_communication:
         No backend issues found — Round-1 gating is ready to ship.
     -agent: "testing"
     -message: |
-        Round-2 Premium test suite (/app/backend_test.py) — 13/14 PASS against public URL.
+        Re-verification (/app/horizons_reverify.py) of GET /api/predictions/{symbol}/horizons after
+        the decorator fix — PASS (all scenarios verified against public URL).
+        
+        Verified end-to-end for demo@alphapulse.app:
+        1) Login → demo_user_id captured (is_admin=true since in ADMIN_EMAILS).
+        2) POST /api/admin/users/{demo_id}/tier {tier:"premium",plan:"monthly"} → 200.
+        3) Re-login → tier=premium. GET /api/predictions/AAPL/horizons → 200 with tier="premium"
+           and 3 horizons (1D/1W/1M — exposed as both horizon:"1D"/"1W"/"1M" and label:"1 Day"/
+           "1 Week"/"1 Month"). All 3 unlocked (locked=false) with full fields: direction,
+           expected_return_pct, target_price, confidence, ai_score.
+        4) POST /api/admin/users/{demo_id}/tier {tier:"free"} → 200 (demo still has admin auth
+           because it stays in ADMIN_EMAILS).
+        5) Re-login → tier=free. GET /api/predictions/AAPL/horizons → 200 with tier="free":
+             • 1D: locked=false, direction=UP, expected_return_pct=0.11, target_price=244.43,
+               confidence=0.53, ai_score=52.8.
+             • 1W: locked=true, premium_required=true, NO direction/target_price/confidence/ai_score.
+             • 1M: locked=true, premium_required=true, NO direction/target_price/confidence/ai_score.
+        6) Anonymous GET /api/predictions/AAPL/horizons → 401.
+        
+        The decorator fix is confirmed working. Task is ready to ship.
+        
+        ----
+        Original Round-2 Premium test suite (/app/backend_test.py) — 13/14 PASS against public URL.
         
         PASSED:
         A. POST /api/predictions/compare (6/6):

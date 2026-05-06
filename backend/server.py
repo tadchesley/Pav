@@ -963,6 +963,7 @@ async def export_watchlist_csv(user=Depends(current_user)):
 
 
 # ---------- Multi-horizon forecasts (Premium) ----------
+@api.get("/predictions/{symbol}/horizons")
 async def prediction_horizons(symbol: str, user=Depends(current_user)):
     """Return predictions at 1-day, 1-week and 1-month horizons.
     Premium-only — free users receive a locked stub for the 1W and 1M horizons.
