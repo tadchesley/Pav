@@ -150,6 +150,8 @@ export default function Settings() {
                 'AI-narrative predictions with Claude Sonnet 4.5',
                 'Multi-horizon forecasts: 1D / 1W / 1M',
                 'Advanced screener: confidence ≥75% & sector filters',
+                'Compare up to 4 stocks side-by-side',
+                'Export predictions & watchlist to CSV',
                 '1-year price history (free: 7 days)',
               ].map((f) => (
                 <View key={f} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 }}>

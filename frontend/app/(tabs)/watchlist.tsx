@@ -1,14 +1,18 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Alert, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Alert, Modal, TextInput, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/api';
 import { useTheme } from '../../src/ThemeContext';
+import { useAuth } from '../../src/AuthContext';
+import { exportCsv } from '../../src/exporter';
 
 export default function Watchlist() {
   const { theme } = useTheme();
   const router = useRouter();
+  const { user } = useAuth();
+  const isPremium = user?.tier === 'premium';
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
@@ -58,10 +62,50 @@ export default function Watchlist() {
   return (
     <SafeAreaView style={s.safe} testID="watchlist-screen">
       <View style={s.header}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={[s.title, { color: theme.textPrimary }]}>Watchlist</Text>
           <Text style={[s.subtitle, { color: theme.textSecondary }]}>AI-tracked stocks</Text>
         </View>
+        <TouchableOpacity
+          testID="btn-compare"
+          onPress={() => {
+            if (!isPremium) {
+              Alert.alert('Premium feature', 'Side-by-side comparison is part of Pav Premium.', [
+                { text: 'Maybe later', style: 'cancel' },
+                { text: 'Upgrade', onPress: () => router.push('/(tabs)/settings') },
+              ]);
+              return;
+            }
+            if (items.length < 2) {
+              Alert.alert('Need more stocks', 'Add at least 2 stocks to your watchlist before comparing.');
+              return;
+            }
+            router.push('/compare');
+          }}
+          style={[s.iconBtn, { backgroundColor: theme.surface, borderColor: theme.border, marginRight: 8 }]}>
+          <Ionicons name="git-compare-outline" size={18} color={isPremium ? theme.textPrimary : theme.textTertiary} />
+          {!isPremium && <Ionicons name="lock-closed" size={9} color={theme.textTertiary} style={{ position: 'absolute', top: 4, right: 4 }} />}
+        </TouchableOpacity>
+        <TouchableOpacity
+          testID="btn-export-watchlist"
+          onPress={() => {
+            if (!isPremium) {
+              Alert.alert('Premium feature', 'CSV export is part of Pav Premium.', [
+                { text: 'Maybe later', style: 'cancel' },
+                { text: 'Upgrade', onPress: () => router.push('/(tabs)/settings') },
+              ]);
+              return;
+            }
+            if (items.length === 0) {
+              Alert.alert('Empty', 'Your watchlist is empty.');
+              return;
+            }
+            exportCsv('/exports/watchlist.csv', `pav_watchlist_${new Date().toISOString().slice(0,10)}.csv`);
+          }}
+          style={[s.iconBtn, { backgroundColor: theme.surface, borderColor: theme.border, marginRight: 8 }]}>
+          <Ionicons name="download-outline" size={18} color={isPremium ? theme.textPrimary : theme.textTertiary} />
+          {!isPremium && <Ionicons name="lock-closed" size={9} color={theme.textTertiary} style={{ position: 'absolute', top: 4, right: 4 }} />}
+        </TouchableOpacity>
         <TouchableOpacity testID="btn-add-watch" onPress={() => setModal(true)} style={[s.addBtn, { backgroundColor: theme.primary }]}>
           <Ionicons name="add" size={22} color={theme.primaryFg} />
         </TouchableOpacity>
@@ -141,5 +185,6 @@ const styles = (t: any) => StyleSheet.create({
   title: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
   subtitle: { fontSize: 13, marginTop: 4 },
   addBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, position: 'relative' },
   row: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 8 },
 });

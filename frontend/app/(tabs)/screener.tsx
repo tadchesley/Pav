@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/api';
 import { useTheme } from '../../src/ThemeContext';
 import { useAuth } from '../../src/AuthContext';
+import { exportCsv } from '../../src/exporter';
 
 const CONF_OPTIONS = [
   { label: 'Any', v: 0, premium: false },
@@ -181,12 +182,30 @@ export default function Screener() {
         <Text style={[s.matchText, { color: theme.textSecondary }]}>
           {filtered.length} match{filtered.length === 1 ? '' : 'es'}
         </Text>
-        {filtersActive && (
-          <TouchableOpacity testID="btn-clear-filters" onPress={reset} style={[s.clearBtn, { borderColor: theme.border }]}>
-            <Ionicons name="close" size={14} color={theme.textSecondary} />
-            <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600', marginLeft: 4 }}>Clear filters</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {filtersActive && (
+            <TouchableOpacity testID="btn-clear-filters" onPress={reset} style={[s.clearBtn, { borderColor: theme.border }]}>
+              <Ionicons name="close" size={14} color={theme.textSecondary} />
+              <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600', marginLeft: 4 }}>Clear filters</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            testID="btn-export-screener"
+            onPress={() => {
+              if (!isPremium) { showPaywall('CSV export'); return; }
+              const params = new URLSearchParams();
+              if (minConf > 0) params.set('min_confidence', String(minConf));
+              if (dir !== 'ALL') params.set('direction', dir);
+              if (sector !== 'ALL') params.set('sector', sector);
+              const qs = params.toString();
+              exportCsv(`/exports/screener.csv${qs ? `?${qs}` : ''}`, `pav_screener_${new Date().toISOString().slice(0,10)}.csv`);
+            }}
+            style={[s.clearBtn, { borderColor: theme.border }]}>
+            {!isPremium && <Ionicons name="lock-closed" size={11} color={theme.textTertiary} style={{ marginRight: 4 }} />}
+            <Ionicons name="download-outline" size={14} color={isPremium ? theme.textPrimary : theme.textTertiary} />
+            <Text style={{ color: isPremium ? theme.textPrimary : theme.textTertiary, fontSize: 12, fontWeight: '600', marginLeft: 4 }}>Export CSV</Text>
           </TouchableOpacity>
-        )}
+        </View>
       </View>
     </View>
   );

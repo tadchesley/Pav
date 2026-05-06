@@ -114,13 +114,75 @@ user_problem_statement: |
   - Ability to manually upgrade/downgrade a user's tier (free/premium-monthly/premium-yearly)
 
 backend:
-  - task: "Premium gating: screener filters + multi-horizon forecasts"
+  - task: "Round 2 Premium: side-by-side compare + CSV exports"
     implemented: true
     working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
     needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: |
+            Added 3 new premium-only endpoints:
+            1. POST /api/predictions/compare — compares 2-4 stock symbols, returns predictions for all
+               three horizons (1D/1W/1M) per symbol plus indicators (rsi, sma_20, sma_50, momentum, volatility).
+               Free user → 403. <2 symbols → 400. >4 symbols → 400.
+            2. GET /api/exports/screener.csv?min_confidence&direction&sector — returns text/csv with the
+               filtered cached screener results. Free user → 403.
+            3. GET /api/exports/watchlist.csv — returns text/csv of the current user's watchlist enriched
+               with predictions from the cache. Free user → 403.
+            
+            All endpoints reuse the cache (instant) and validate inputs.
+        -working: true
+        -agent: "testing"
+        -comment: |
+            Round-2 backend test (/app/backend_test.py) — 13/14 PASS against public URL.
+            
+            A. POST /api/predictions/compare (all 6 sub-cases PASS):
+              - FREE user with 2 symbols → 403 with detail "Premium required for side-by-side comparison" ✓
+              - Admin POST /api/admin/users/{id}/tier {tier:premium,plan:monthly} → 200 ✓
+              - PREMIUM user with 4 symbols [AAPL,MSFT,GOOGL,NVDA] → 200, count=4, items length=4.
+                Each item has all required keys (symbol, name, sector, current_price, rsi_14, sma_20,
+                sma_50, momentum_10, volatility, predictions). Predictions object has exactly keys
+                ["1D","1W","1M"]; each horizon has direction, expected_return_pct, target_price,
+                confidence, ai_score ✓
+              - 1 symbol → 400 "Provide a list of at least 2 symbols" ✓
+              - 5 symbols → 400 "Maximum 4 symbols allowed" ✓
+              - Empty list → 400 ✓
+            
+            B. CSV exports (all 5 sub-cases PASS):
+              - FREE user GET /exports/screener.csv → 403 ✓
+              - PREMIUM user GET /exports/screener.csv → 200, Content-Type "text/csv; charset=utf-8".
+                Header line exactly: "symbol,name,sector,ai_score,direction,current_price,target_price,
+                expected_return_pct,confidence,rsi_14". Body has 871 data rows (cache fully warm) ✓
+              - GET /exports/screener.csv?min_confidence=0.7&direction=UP → 200; parsed CSV verified
+                all 21 returned rows have direction=UP and confidence>=0.7 ✓
+              - PREMIUM GET /exports/watchlist.csv → 200, header row present, 0 data rows
+                (empty watchlist for fresh user — expected) ✓
+              - FREE GET /exports/watchlist.csv → 403 ✓
+            
+            C. Regression — 2/3 PASS, 1 FAIL:
+              - GET /api/predictions/AAPL/horizons → 404 "Not Found" ❌ (see below)
+              - POST /api/predictions/screener → 200, 871 results, total_in_cache=871 ✓
+              - GET /api/admin/stats → 200, users.total=13, mrr=19.96 ✓
+            
+            CRITICAL ISSUE: GET /api/predictions/{symbol}/horizons returns 404. The function
+            `prediction_horizons` exists in server.py (line 966) but the route decorator
+            `@api.get("/predictions/{symbol}/horizons")` is MISSING — it was never wired into the
+            APIRouter. This is a regression from Round-1 (when it was reportedly working). Main
+            agent likely lost the decorator while editing the surrounding code. Fix is one line:
+            add `@api.get("/predictions/{symbol}/horizons")` directly above the
+            `async def prediction_horizons(...)` definition at line 966.
+
+  - task: "Premium gating: screener filters + multi-horizon forecasts"
+    implemented: true
+    working: false
+    file: "/app/backend/server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
     status_history:
         -working: "NA"
         -agent: "main"
@@ -233,7 +295,8 @@ metadata:
   test_sequence: 0
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Premium gating: screener filters + multi-horizon forecasts"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -283,3 +346,36 @@ agent_communication:
            "🔒 Upgrade…" narrative. GET /api/auth/me includes is_admin field.
         
         No backend issues found — Round-1 gating is ready to ship.
+    -agent: "testing"
+    -message: |
+        Round-2 Premium test suite (/app/backend_test.py) — 13/14 PASS against public URL.
+        
+        PASSED:
+        A. POST /api/predictions/compare (6/6):
+          - FREE → 403 "Premium required for side-by-side comparison"
+          - Admin tier flip → 200; PREMIUM /compare with 4 symbols → 200 with count=4, items length=4,
+            each item containing all required keys, predictions object {1D,1W,1M} each with
+            direction/expected_return_pct/target_price/confidence/ai_score
+          - 1 symbol → 400, 5 symbols → 400, empty → 400
+        
+        B. CSV exports (5/5):
+          - FREE /exports/screener.csv → 403; FREE /exports/watchlist.csv → 403
+          - PREMIUM /exports/screener.csv → 200 text/csv, exact required header, 871 data rows
+          - /exports/screener.csv?min_confidence=0.7&direction=UP → 200, all 21 returned rows
+            verified direction=UP and confidence>=0.7
+          - PREMIUM /exports/watchlist.csv → 200 with header (0 data rows for fresh user)
+        
+        C. Regression (2/3):
+          - POST /api/predictions/screener → 200 with 871 results ✓
+          - GET /api/admin/stats → 200, well-formed ✓
+          - GET /api/predictions/AAPL/horizons → 404 Not Found ❌ REGRESSION
+        
+        ROOT CAUSE for the 1 failure: In /app/backend/server.py the function `prediction_horizons`
+        is defined at line 966 but its route decorator `@api.get("/predictions/{symbol}/horizons")`
+        is MISSING. The function exists but is never wired to the APIRouter, so requests get 404.
+        Round-1 had this endpoint working — the decorator was lost in a subsequent edit when the
+        new compare/exports endpoints were added. One-line fix: add
+        `@api.get("/predictions/{symbol}/horizons")` directly above `async def prediction_horizons`.
+        I did NOT apply the fix (per testing-agent guidelines — main agent's responsibility to fix).
+        
+        Round-2 new endpoints (compare + CSV exports) themselves are fully working and ready to ship.

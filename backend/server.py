@@ -12,7 +12,7 @@ import httpx
 import bcrypt
 import yfinance as yf
 from jose import jwt, JWTError
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -845,8 +845,124 @@ async def screener(body: dict, user=Depends(current_user)):
     }
 
 
+# ---------- Multi-stock compare (Premium) ----------
+@api.post("/predictions/compare")
+async def compare_stocks(body: dict, user=Depends(current_user)):
+    """Compare up to 4 stocks side-by-side with predictions across all horizons.
+    Premium-only feature.
+    """
+    if user.get("tier") != "premium":
+        raise HTTPException(403, "Premium required for side-by-side comparison")
+
+    symbols_in = body.get("symbols", [])
+    if not isinstance(symbols_in, list) or len(symbols_in) < 2:
+        raise HTTPException(400, "Provide a list of at least 2 symbols")
+    if len(symbols_in) > 4:
+        raise HTTPException(400, "Maximum 4 symbols allowed")
+
+    symbols = [s.upper().strip() for s in symbols_in if isinstance(s, str) and s.strip()]
+    if len(symbols) < 2:
+        raise HTTPException(400, "Provide at least 2 valid symbols")
+
+    async def _build(sym: str) -> dict:
+        try:
+            quote_data, candle_data = await asyncio.gather(get_quote(sym), get_candles(sym, 60))
+            indicators = compute_indicators(candle_data)
+            if indicators["current"] == 0:
+                indicators["current"] = quote_data.get("c", 0)
+            profile = TICKERS_DICT.get(sym, {"name": sym, "sector": "Unknown"})
+            preds = {h: statistical_prediction(sym, indicators, candle_data, horizon_days=d)
+                     for h, d in [("1D", 1), ("1W", 7), ("1M", 30)]}
+            return {
+                "symbol": sym,
+                "name": profile.get("name", sym),
+                "sector": profile.get("sector", "Unknown"),
+                "current_price": indicators["current"],
+                "rsi_14": indicators["rsi_14"],
+                "sma_20": indicators["sma_20"],
+                "sma_50": indicators["sma_50"],
+                "momentum_10": indicators["momentum_10"],
+                "volatility": indicators["volatility"],
+                "predictions": preds,
+                "ok": True,
+            }
+        except Exception as e:
+            logger.warning(f"compare {sym} failed: {e}")
+            return {"symbol": sym, "ok": False, "error": str(e)}
+
+    results = await asyncio.gather(*[_build(s) for s in symbols])
+    return {"items": results, "count": len(results)}
+
+
+# ---------- CSV exports (Premium) ----------
+def _csv_response(rows: List[List[Any]], filename: str):
+    import csv, io
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    for r in rows:
+        w.writerow(r)
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@api.get("/exports/screener.csv")
+async def export_screener_csv(
+    min_confidence: float = 0.0,
+    direction: Optional[str] = None,
+    sector: Optional[str] = None,
+    user=Depends(current_user),
+):
+    """Export current screener results as CSV. Premium-only."""
+    if user.get("tier") != "premium":
+        raise HTTPException(403, "Premium required for CSV export")
+    data = _screener_cache["data"] or []
+    rows: List[List[Any]] = [["symbol", "name", "sector", "ai_score", "direction", "current_price", "target_price", "expected_return_pct", "confidence", "rsi_14"]]
+    for r in data:
+        if r.get("confidence", 0) < min_confidence:
+            continue
+        if direction and r.get("direction") != direction:
+            continue
+        if sector and r.get("sector") != sector:
+            continue
+        rows.append([
+            r.get("symbol", ""), r.get("name", ""), r.get("sector", ""),
+            r.get("ai_score", ""), r.get("direction", ""),
+            r.get("current_price", ""), r.get("target_price", ""),
+            r.get("expected_return_pct", ""), r.get("confidence", ""),
+            r.get("rsi_14", ""),
+        ])
+    return _csv_response(rows, f"pav_screener_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.csv")
+
+
+@api.get("/exports/watchlist.csv")
+async def export_watchlist_csv(user=Depends(current_user)):
+    """Export the current user's watchlist as CSV with live predictions. Premium-only."""
+    if user.get("tier") != "premium":
+        raise HTTPException(403, "Premium required for CSV export")
+
+    cursor = db.watchlist.find({"user_id": user["id"]})
+    syms: List[str] = []
+    async for d in cursor:
+        syms.append(d["symbol"])
+
+    cache_data = _screener_cache["data"] or []
+    cache_by_sym = {r["symbol"]: r for r in cache_data}
+    rows: List[List[Any]] = [["symbol", "name", "sector", "ai_score", "direction", "current_price", "target_price", "expected_return_pct", "confidence"]]
+    for sym in syms:
+        r = cache_by_sym.get(sym, {})
+        rows.append([
+            sym, r.get("name", ""), r.get("sector", ""),
+            r.get("ai_score", ""), r.get("direction", ""),
+            r.get("current_price", ""), r.get("target_price", ""),
+            r.get("expected_return_pct", ""), r.get("confidence", ""),
+        ])
+    return _csv_response(rows, f"pav_watchlist_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.csv")
+
+
 # ---------- Multi-horizon forecasts (Premium) ----------
-@api.get("/predictions/{symbol}/horizons")
 async def prediction_horizons(symbol: str, user=Depends(current_user)):
     """Return predictions at 1-day, 1-week and 1-month horizons.
     Premium-only — free users receive a locked stub for the 1W and 1M horizons.
