@@ -28,17 +28,27 @@ export default function Screener() {
   const [minConf, setMinConf] = useState<number>(0);
   const [all, setAll] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [warming, setWarming] = useState(false);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
 
   const load = useCallback(async () => {
-    setLoading(true);
     try {
       const { data } = await api.post('/predictions/screener', { min_confidence: 0 });
       setAll(data.results);
+      setWarming(!!data.warming);
+      setProgress({ done: data.progress || 0, total: data.total_universe || 0 });
     } catch (e) { console.warn(e); }
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    // Auto-poll while cache is warming so the UI fills in progressively
+    const id = setInterval(() => {
+      if (warming || all.length === 0) load();
+    }, 5000);
+    return () => clearInterval(id);
+  }, [load, warming, all.length]);
 
   const filtered = useMemo(() => all.filter(x =>
     (dir === 'ALL' || x.direction === dir) &&
@@ -156,6 +166,17 @@ export default function Screener() {
       <View style={s.header}>
         <Text style={[s.title, { color: theme.textPrimary }]}>Screener</Text>
         <Text style={[s.subtitle, { color: theme.textSecondary }]}>AI-ranked predictions across {all.length || 871} symbols</Text>
+        {warming && progress.total > 0 && (
+          <View style={{ marginTop: 10 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+              <Text style={{ color: theme.textTertiary, fontSize: 11 }}>Building predictions…</Text>
+              <Text style={{ color: theme.textTertiary, fontSize: 11 }}>{progress.done} / {progress.total}</Text>
+            </View>
+            <View style={{ height: 3, backgroundColor: theme.border, borderRadius: 2, overflow: 'hidden' }}>
+              <View style={{ width: `${Math.min(100, (progress.done / progress.total) * 100)}%`, height: '100%', backgroundColor: theme.neutral }} />
+            </View>
+          </View>
+        )}
       </View>
 
       {loading ? (
@@ -186,7 +207,18 @@ export default function Screener() {
               </View>
             </TouchableOpacity>
           )}
-          ListEmptyComponent={<Text style={{ textAlign: 'center', color: theme.textTertiary, marginTop: 40 }}>No matches. Try adjusting filters.</Text>}
+          ListEmptyComponent={
+            loading || warming ? (
+              <View style={{ paddingTop: 40, alignItems: 'center' }}>
+                <ActivityIndicator color={theme.textPrimary} />
+                <Text style={{ color: theme.textSecondary, marginTop: 12 }}>
+                  {warming ? `Warming up predictions… ${progress.done}/${progress.total}` : 'Loading…'}
+                </Text>
+              </View>
+            ) : (
+              <Text style={{ textAlign: 'center', color: theme.textTertiary, marginTop: 40 }}>No matches. Try adjusting filters.</Text>
+            )
+          }
         />
       )}
     </SafeAreaView>

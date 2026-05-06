@@ -146,8 +146,38 @@ SCREENER_UNIVERSE_SYMBOLS = [
 ALL_UNIVERSE_SYMBOLS = list(TICKERS_DICT.keys())
 
 # In-memory screener cache (5-min TTL)
-_screener_cache: dict = {"data": None, "ts": 0}
+_screener_cache: dict = {"data": None, "ts": 0, "warming": False, "progress": 0, "total": 0}
 _SCREENER_CACHE_TTL = 300
+
+
+async def _warm_screener_cache():
+    """Background task: build screener predictions for all 871 tickers in batches."""
+    if _screener_cache["warming"]:
+        return
+    _screener_cache["warming"] = True
+    _screener_cache["progress"] = 0
+    _screener_cache["total"] = len(ALL_UNIVERSE_SYMBOLS)
+    try:
+        partial: list = []
+        chunk_size = 50
+        for i in range(0, len(ALL_UNIVERSE_SYMBOLS), chunk_size):
+            chunk = ALL_UNIVERSE_SYMBOLS[i:i + chunk_size]
+            chunk_results = await asyncio.gather(
+                *[build_prediction(s, use_llm=False) for s in chunk],
+                return_exceptions=True,
+            )
+            for r in chunk_results:
+                if isinstance(r, dict):
+                    partial.append({k: v for k, v in r.items()
+                                    if k not in ("indicators", "narrative", "key_factors", "risks", "feature_importance")})
+            _screener_cache["progress"] = i + len(chunk)
+            # Update partial cache so frontend can show data progressively
+            _screener_cache["data"] = list(partial)
+        _screener_cache["data"] = partial
+        _screener_cache["ts"] = datetime.now(timezone.utc).timestamp()
+        logger.info(f"Screener cache warm complete: {len(partial)} predictions")
+    finally:
+        _screener_cache["warming"] = False
 
 # Use ticker list as the primary ticker source
 SEED_BY_SYMBOL = TICKERS_DICT
@@ -738,34 +768,21 @@ async def top_movers(user=Depends(current_user)):
 
 @api.post("/predictions/screener")
 async def screener(body: dict, user=Depends(current_user)):
-    """Returns predictions for ALL 871 tickers, cached 5 minutes for performance."""
+    """Returns cached predictions for ALL 871 tickers. Cache rebuilds in background — never blocks request."""
     min_conf = body.get("min_confidence", 0)
     min_return = body.get("min_return", -100)
     direction = body.get("direction")
     sector = body.get("sector")
 
     now = datetime.now(timezone.utc).timestamp()
-    if _screener_cache["data"] is None or (now - _screener_cache["ts"]) > _SCREENER_CACHE_TTL:
-        # Rebuild cache — process in chunks of 50 to avoid overwhelming Finnhub rate limits
-        all_results: list = []
-        chunk_size = 50
-        for i in range(0, len(ALL_UNIVERSE_SYMBOLS), chunk_size):
-            chunk = ALL_UNIVERSE_SYMBOLS[i:i + chunk_size]
-            chunk_results = await asyncio.gather(
-                *[build_prediction(s, use_llm=False) for s in chunk],
-                return_exceptions=True,
-            )
-            all_results.extend(chunk_results)
-        valid = [
-            {k: v for k, v in r.items() if k not in ("indicators", "narrative", "key_factors", "risks", "feature_importance")}
-            for r in all_results if isinstance(r, dict)
-        ]
-        _screener_cache["data"] = valid
-        _screener_cache["ts"] = now
-        logger.info(f"Screener cache rebuilt: {len(valid)} predictions")
+    cache_stale = _screener_cache["data"] is None or (now - _screener_cache["ts"]) > _SCREENER_CACHE_TTL
+    if cache_stale and not _screener_cache["warming"]:
+        # Kick off background warm — DON'T await
+        asyncio.create_task(_warm_screener_cache())
 
+    data = _screener_cache["data"] or []
     out = []
-    for r in _screener_cache["data"]:
+    for r in data:
         if r["confidence"] < min_conf:
             continue
         if r["expected_return_pct"] < min_return:
@@ -776,7 +793,14 @@ async def screener(body: dict, user=Depends(current_user)):
             continue
         out.append(r)
     out.sort(key=lambda x: -x["ai_score"])
-    return {"results": out, "cache_age_seconds": int(now - _screener_cache["ts"])}
+    return {
+        "results": out,
+        "total_in_cache": len(data),
+        "warming": _screener_cache["warming"],
+        "progress": _screener_cache["progress"],
+        "total_universe": _screener_cache["total"] or len(ALL_UNIVERSE_SYMBOLS),
+        "cache_age_seconds": int(now - _screener_cache["ts"]) if _screener_cache["ts"] else None,
+    }
 
 
 # ---------- Watchlist ----------
@@ -907,6 +931,8 @@ async def _startup():
     await db.watchlist.create_index([("user_id", 1), ("symbol", 1)], unique=True)
     await db.alerts.create_index([("user_id", 1), ("created_at", -1)])
     logger.info("Indexes ensured. FINNHUB_KEY set: %s | EMERGENT_LLM_KEY set: %s", bool(FINNHUB_API_KEY), bool(EMERGENT_LLM_KEY))
+    # Warm screener cache in background — non-blocking
+    asyncio.create_task(_warm_screener_cache())
 
 
 @app.on_event("shutdown")
