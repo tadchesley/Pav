@@ -114,6 +114,64 @@ user_problem_statement: |
   - Ability to manually upgrade/downgrade a user's tier (free/premium-monthly/premium-yearly)
 
 backend:
+  - task: "Premium gating: screener filters + multi-horizon forecasts"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: |
+            Round 1 of paywall feature buildout.
+            
+            Backend changes:
+            1. POST /api/predictions/screener — Free-tier users now have advanced filters silently capped:
+               - min_confidence above 0.6 → reduced to 0.6
+               - sector filter → cleared
+               Response now includes tier, locked_filters[], free_max_confidence:0.6.
+            2. New endpoint GET /api/predictions/{symbol}/horizons — returns 1D / 1W / 1M forecasts.
+               Free users get the 1D forecast (preview) and locked stubs for 1W and 1M (premium_required:true).
+               Premium users get all three with horizon-specific stat-prediction (different return factors,
+               horizon-aware confidence penalty, weighted indicator usage by horizon).
+            3. statistical_prediction() now accepts horizon_days param (1, 7, 30) and adjusts feature weights
+               and return_factor accordingly so each horizon is meaningfully different.
+        -working: true
+        -agent: "testing"
+        -comment: |
+            Executed /app/backend_test_round1.py — 23/23 PASSED against live backend.
+            
+            A. Multi-horizon forecasts GET /api/predictions/AAPL/horizons:
+              - Anonymous (no token) → 401 ✓
+              - FREE user → 200 with tier="free", horizons array length 3 with keys [1D, 1W, 1M].
+                1D: locked=false with full fields populated (direction=UP, ai_score=56.5,
+                expected_return_pct=0.26, target_price=284.92, confidence=0.57). 1W & 1M: locked=true,
+                premium_required=true, NO direction/target_price/confidence/ai_score keys present ✓
+              - PREMIUM user (after admin tier upgrade {tier:premium,plan:yearly} and re-login) → 200
+                with tier="premium". All 3 horizons unlocked with full fields. Return scaling verified:
+                |1D|=0.26 < |1M|=3.45 (return_factor scales 0.04→0.10→0.15). Confidences [0.57, 0.64, 0.68]
+                all in [0.5, 0.95] range ✓
+            
+            B. Screener filter gating POST /api/predictions/screener (cache fully warm: 871/871):
+              - FREE user with {min_confidence:0.85, sector:"Technology"} → 200 with tier="free",
+                locked_filters=["min_confidence_above_60","sector_filter"], free_max_confidence=0.6.
+                Sector filter was cleared: 312 results spanning 15 distinct sectors (Technology was just
+                one of many, confirming sector="Technology" was NOT applied) ✓
+              - FREE user with {min_confidence:0.6, sector:null} → locked_filters=[] ✓
+              - After demote→free, then re-promote→premium: PREMIUM user with {min_confidence:0.85,
+                sector:"Technology"} → tier="premium", locked_filters=[], filters applied (returned 0
+                results because no ticker has confidence>=0.85 AND sector="Technology" in current cache —
+                vacuously correct, no rows violate constraints) ✓
+            
+            C. Regression:
+              - GET /api/predictions/AAPL?deep=true (free user) → 200, premium_required=true,
+                narrative starts with "🔒 Upgrade to Pav Premium for AI-powered narrative…" ✓
+              - GET /api/auth/me → includes is_admin field (=false for the test user) ✓
+            
+            All 23 checks pass. No backend issues found.
+
   - task: "Admin endpoints (stats, signups chart, users list, set tier, top watched)"
     implemented: true
     working: true
@@ -199,3 +257,29 @@ agent_communication:
     -message: |
         Admin backend test suite (/app/backend_test.py) — 16/16 PASS against public URL.
         All 10 requested scenarios + regression (auth/me, alerts, watchlist) verified. Response shape for /admin/stats matches spec (integers everywhere, by_provider object, revenue.currency="USD"). Signups chart returns exactly 30 items with valid YYYY-MM-DD dates. Auth gating verified: admin=200, non-admin=403, no-token=401. Tier upgrade→yearly and downgrade→free (with list verification) both work; invalid tier returns 400. No backend issues found — task is ready to ship.
+    -agent: "testing"
+    -message: |
+        Round-1 Premium gating test suite (/app/backend_test_round1.py) — 23/23 PASS against public URL.
+        
+        A. GET /api/predictions/AAPL/horizons:
+          - Anonymous → 401
+          - FREE: tier="free", 3 horizons. 1D unlocked w/ full fields (direction, expected_return_pct,
+            target_price, confidence, ai_score). 1W & 1M locked=true, premium_required=true,
+            and contain NO direction/target_price/confidence/ai_score keys (locked stub respected).
+          - PREMIUM (after admin upgrade {tier:premium,plan:yearly}): tier="premium", all 3 horizons
+            unlocked w/ full fields. Return scaling verified: |1D|=0.26 < |1M|=3.45 (return_factor
+            scales 0.04→0.10→0.15). Confidences [0.57, 0.64, 0.68] all in [0.5, 0.95].
+        
+        B. POST /api/predictions/screener (cache fully warm: 871 predictions):
+          - FREE w/ {min_confidence:0.85, sector:"Technology"}: tier="free",
+            locked_filters=["min_confidence_above_60","sector_filter"], free_max_confidence=0.6.
+            Sector filter cleared: 312 results spanning 15 distinct sectors.
+          - FREE w/ {min_confidence:0.6, sector:null}: locked_filters=[].
+          - PREMIUM (after demote→re-promote) w/ {min_confidence:0.85, sector:"Technology"}:
+            tier="premium", locked_filters=[], filters applied (0 results because no ticker
+            currently has confidence>=0.85 AND Technology sector — vacuously correct).
+        
+        C. Regression: GET /api/predictions/AAPL?deep=true (free) returns premium_required=true with
+           "🔒 Upgrade…" narrative. GET /api/auth/me includes is_admin field.
+        
+        No backend issues found — Round-1 gating is ready to ship.

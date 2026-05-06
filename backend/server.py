@@ -388,8 +388,8 @@ def compute_indicators(candles: dict) -> dict:
     }
 
 
-def statistical_prediction(symbol: str, indicators: dict, candles: dict) -> dict:
-    """Fast heuristic prediction based on indicators."""
+def statistical_prediction(symbol: str, indicators: dict, candles: dict, horizon_days: int = 30) -> dict:
+    """Fast heuristic prediction based on indicators. Horizon-aware (1, 7, 30 day defaults)."""
     score = 50  # neutral baseline
     rsi = indicators["rsi_14"]
     current = indicators["current"]
@@ -397,24 +397,39 @@ def statistical_prediction(symbol: str, indicators: dict, candles: dict) -> dict
     sma50 = indicators["sma_50"] or current
     momentum = indicators["momentum_10"]
 
-    if rsi < 30:
-        score += 15  # oversold
-    elif rsi > 70:
-        score -= 15  # overbought
-    else:
-        score += (50 - rsi) * 0.2
-
-    if current > sma20:
-        score += 8
-    if sma20 > sma50:
-        score += 10
-    score += max(min(momentum * 1.2, 15), -15)
+    # Short horizon — weight RSI/momentum more
+    if horizon_days <= 1:
+        if rsi < 30: score += 12
+        elif rsi > 70: score -= 12
+        else: score += (50 - rsi) * 0.25
+        if current > sma20: score += 5
+        score += max(min(momentum * 0.8, 8), -8)
+        return_factor = 0.04
+        horizon_penalty = 0.0
+    elif horizon_days <= 7:
+        if rsi < 30: score += 14
+        elif rsi > 70: score -= 14
+        else: score += (50 - rsi) * 0.22
+        if current > sma20: score += 7
+        if sma20 > sma50: score += 6
+        score += max(min(momentum * 1.0, 12), -12)
+        return_factor = 0.10
+        horizon_penalty = 0.02
+    else:  # 1-month and longer
+        if rsi < 30: score += 15
+        elif rsi > 70: score -= 15
+        else: score += (50 - rsi) * 0.2
+        if current > sma20: score += 8
+        if sma20 > sma50: score += 10
+        score += max(min(momentum * 1.2, 15), -15)
+        return_factor = 0.15
+        horizon_penalty = 0.05
 
     score = max(0, min(100, score))
     direction = "UP" if score > 52 else ("DOWN" if score < 48 else "NEUTRAL")
-    expected_return_pct = round((score - 50) * 0.15, 2)
+    expected_return_pct = round((score - 50) * return_factor, 2)
     target_price = round(current * (1 + expected_return_pct / 100), 2)
-    confidence = round(min(0.95, 0.5 + abs(score - 50) / 100), 2)
+    confidence = round(min(0.95, max(0.5, 0.5 + abs(score - 50) / 100 - horizon_penalty)), 2)
 
     return {
         "symbol": symbol,
@@ -423,7 +438,7 @@ def statistical_prediction(symbol: str, indicators: dict, candles: dict) -> dict
         "expected_return_pct": expected_return_pct,
         "target_price": target_price,
         "confidence": confidence,
-        "horizon_days": 30,
+        "horizon_days": horizon_days,
     }
 
 
@@ -778,28 +793,42 @@ async def top_movers(user=Depends(current_user)):
 
 @api.post("/predictions/screener")
 async def screener(body: dict, user=Depends(current_user)):
-    """Returns cached predictions for ALL 871 tickers. Cache rebuilds in background — never blocks request."""
-    min_conf = body.get("min_confidence", 0)
+    """Returns cached predictions for ALL 871 tickers. Cache rebuilds in background — never blocks request.
+
+    Premium-only filters: sector and min_confidence > 0.6 are gated.
+    Free users requesting these are silently capped to free tier limits + flag returned.
+    """
+    is_premium = user.get("tier") == "premium"
+    min_conf_req = float(body.get("min_confidence", 0))
     min_return = body.get("min_return", -100)
     direction = body.get("direction")
-    sector = body.get("sector")
+    sector_req = body.get("sector")
+
+    # Gate advanced filters for free tier
+    locked: List[str] = []
+    if not is_premium:
+        if min_conf_req > 0.6:
+            locked.append("min_confidence_above_60")
+            min_conf_req = 0.6
+        if sector_req:
+            locked.append("sector_filter")
+            sector_req = None
 
     now = datetime.now(timezone.utc).timestamp()
     cache_stale = _screener_cache["data"] is None or (now - _screener_cache["ts"]) > _SCREENER_CACHE_TTL
     if cache_stale and not _screener_cache["warming"]:
-        # Kick off background warm — DON'T await
         asyncio.create_task(_warm_screener_cache())
 
     data = _screener_cache["data"] or []
     out = []
     for r in data:
-        if r["confidence"] < min_conf:
+        if r["confidence"] < min_conf_req:
             continue
         if r["expected_return_pct"] < min_return:
             continue
         if direction and r["direction"] != direction:
             continue
-        if sector and r.get("sector") != sector:
+        if sector_req and r.get("sector") != sector_req:
             continue
         out.append(r)
     out.sort(key=lambda x: -x["ai_score"])
@@ -810,6 +839,64 @@ async def screener(body: dict, user=Depends(current_user)):
         "progress": _screener_cache["progress"],
         "total_universe": _screener_cache["total"] or len(ALL_UNIVERSE_SYMBOLS),
         "cache_age_seconds": int(now - _screener_cache["ts"]) if _screener_cache["ts"] else None,
+        "tier": "premium" if is_premium else "free",
+        "locked_filters": locked,
+        "free_max_confidence": 0.6,
+    }
+
+
+# ---------- Multi-horizon forecasts (Premium) ----------
+@api.get("/predictions/{symbol}/horizons")
+async def prediction_horizons(symbol: str, user=Depends(current_user)):
+    """Return predictions at 1-day, 1-week and 1-month horizons.
+    Premium-only — free users receive a locked stub for the 1W and 1M horizons.
+    """
+    symbol = symbol.upper()
+    is_premium = user.get("tier") == "premium"
+
+    quote_data, candle_data = await asyncio.gather(get_quote(symbol), get_candles(symbol, 90))
+    indicators = compute_indicators(candle_data)
+    if indicators["current"] == 0:
+        indicators["current"] = quote_data.get("c", 0)
+    profile = TICKERS_DICT.get(symbol, {"name": symbol, "sector": "Unknown"})
+    name = profile.get("name", symbol)
+
+    horizons = [
+        {"key": "1D", "label": "1 Day", "days": 1},
+        {"key": "1W", "label": "1 Week", "days": 7},
+        {"key": "1M", "label": "1 Month", "days": 30},
+    ]
+    items = []
+    for h in horizons:
+        # 1D is free for everyone (preview), 1W/1M premium-only
+        is_locked = (not is_premium) and h["days"] > 1
+        if is_locked:
+            items.append({
+                "horizon": h["key"], "label": h["label"], "days": h["days"],
+                "locked": True, "premium_required": True,
+                "name": name, "current_price": indicators["current"],
+            })
+            continue
+        pred = statistical_prediction(symbol, indicators, candle_data, horizon_days=h["days"])
+        items.append({
+            "horizon": h["key"],
+            "label": h["label"],
+            "days": h["days"],
+            "locked": False,
+            "name": name,
+            "current_price": indicators["current"],
+            "ai_score": pred["ai_score"],
+            "direction": pred["direction"],
+            "expected_return_pct": pred["expected_return_pct"],
+            "target_price": pred["target_price"],
+            "confidence": pred["confidence"],
+        })
+    return {
+        "symbol": symbol,
+        "name": name,
+        "current_price": indicators["current"],
+        "tier": "premium" if is_premium else "free",
+        "horizons": items,
     }
 
 

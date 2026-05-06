@@ -146,14 +146,11 @@ export default function Settings() {
               <Text style={{ color: '#FAFAFA', fontSize: 40, fontWeight: '700', letterSpacing: -1.5, marginBottom: 20 }}>Unlock AI Alpha</Text>
               {[
                 'Unlimited watchlist symbols (free: 15)',
+                'Unlimited alerts (free: 3)',
                 'AI-narrative predictions with Claude Sonnet 4.5',
-                'Real-time Finnhub quotes (free: end-of-day)',
-                'Unlimited alerts + AI confidence triggers',
-                'Advanced screener filters & confidence ≥75%',
-                '1-year price history (free: 7 days)',
                 'Multi-horizon forecasts: 1D / 1W / 1M',
-                'Compare up to 4 stocks side-by-side',
-                'Export predictions to CSV',
+                'Advanced screener: confidence ≥75% & sector filters',
+                '1-year price history (free: 7 days)',
               ].map((f) => (
                 <View key={f} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 }}>
                   <Ionicons name="checkmark-circle" size={20} color="#22C55E" style={{ marginTop: 2 }} />

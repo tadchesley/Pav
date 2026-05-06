@@ -1,16 +1,17 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, FlatList, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, FlatList, RefreshControl, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/api';
 import { useTheme } from '../../src/ThemeContext';
+import { useAuth } from '../../src/AuthContext';
 
 const CONF_OPTIONS = [
-  { label: 'Any', v: 0 },
-  { label: '≥ 60%', v: 0.6 },
-  { label: '≥ 75%', v: 0.75 },
-  { label: '≥ 85%', v: 0.85 },
+  { label: 'Any', v: 0, premium: false },
+  { label: '≥ 60%', v: 0.6, premium: false },
+  { label: '≥ 75%', v: 0.75, premium: true },
+  { label: '≥ 85%', v: 0.85, premium: true },
 ];
 
 const DIR_OPTIONS = [
@@ -23,6 +24,8 @@ const DIR_OPTIONS = [
 export default function Screener() {
   const { theme } = useTheme();
   const router = useRouter();
+  const { user } = useAuth();
+  const isPremium = user?.tier === 'premium';
   const [dir, setDir] = useState<string>('ALL');
   const [sector, setSector] = useState<string>('ALL');
   const [minConf, setMinConf] = useState<number>(0);
@@ -30,6 +33,17 @@ export default function Screener() {
   const [loading, setLoading] = useState(true);
   const [warming, setWarming] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
+
+  const showPaywall = (which: string) => {
+    Alert.alert(
+      'Premium feature',
+      `${which} is part of Pav Premium. Upgrade to unlock advanced screener filters, multi-horizon forecasts, AI narratives, and more.`,
+      [
+        { text: 'Maybe later', style: 'cancel' },
+        { text: 'Upgrade', onPress: () => router.push('/(tabs)/settings') },
+      ],
+    );
+  };
 
   const load = useCallback(async () => {
     try {
@@ -110,36 +124,52 @@ export default function Screener() {
       <View style={s.confRow}>
         {CONF_OPTIONS.map(c => {
           const active = minConf === c.v;
+          const locked = c.premium && !isPremium;
           return (
             <TouchableOpacity
               key={c.label}
               testID={`chip-conf-${c.v}`}
-              onPress={() => setMinConf(c.v)}
+              onPress={() => locked ? showPaywall('Confidence threshold above 60%') : setMinConf(c.v)}
               style={[s.confCard, {
                 borderColor: active ? theme.primary : theme.border,
                 backgroundColor: active ? theme.primary : theme.surface,
+                opacity: locked ? 0.65 : 1,
               }]}>
-              <Text style={[s.confLabel, { color: active ? theme.primaryFg : theme.textPrimary }]}>{c.label}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {locked && <Ionicons name="lock-closed" size={11} color={active ? theme.primaryFg : theme.textTertiary} style={{ marginRight: 4 }} />}
+                <Text style={[s.confLabel, { color: active ? theme.primaryFg : theme.textPrimary }]}>{c.label}</Text>
+              </View>
             </TouchableOpacity>
           );
         })}
       </View>
 
       {/* Sector */}
-      <Text style={[s.sectionLabel, { color: theme.textSecondary, marginTop: 18 }]}>SECTOR</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 18, marginBottom: 10 }}>
+        <Text style={[s.sectionLabel, { color: theme.textSecondary, marginTop: 0, marginBottom: 0 }]}>SECTOR</Text>
+        {!isPremium && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: theme.neutralBg, borderRadius: 4 }}>
+            <Ionicons name="lock-closed" size={10} color={theme.neutral} />
+            <Text style={{ color: theme.neutral, fontSize: 9, fontWeight: '700', marginLeft: 3, letterSpacing: 0.5 }}>PREMIUM</Text>
+          </View>
+        )}
+      </View>
       <View style={s.sectorWrap}>
         {sectorList.map(([sec, count]) => {
           const active = sector === sec;
           const label = sec === 'ALL' ? 'All' : (sec as string);
+          const locked = !isPremium && sec !== 'ALL';
           return (
             <TouchableOpacity
               key={String(sec)}
               testID={`chip-sector-${String(sec).replace(/\s/g, '_')}`}
-              onPress={() => setSector(sec as string)}
+              onPress={() => locked ? showPaywall('Sector filtering') : setSector(sec as string)}
               style={[s.sectorCard, {
                 borderColor: active ? theme.primary : theme.border,
                 backgroundColor: active ? theme.primary : theme.surface,
+                opacity: locked ? 0.55 : 1,
               }]}>
+              {locked && <Ionicons name="lock-closed" size={10} color={theme.textTertiary} style={{ marginRight: 4 }} />}
               <Text style={[s.sectorLabel, { color: active ? theme.primaryFg : theme.textPrimary }]}>{label}</Text>
               <Text style={[s.sectorCount, { color: active ? theme.primaryFg : theme.textTertiary }]}>{count}</Text>
             </TouchableOpacity>
