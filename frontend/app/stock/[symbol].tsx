@@ -91,9 +91,7 @@ export default function StockDetail() {
 
           {/* Live / Delayed badge */}
           {quoteMeta && (
-            <TouchableOpacity
-              onPress={() => !isPremium && router.push('/(tabs)/settings')}
-              activeOpacity={isPremium ? 1 : 0.7}
+            <View
               style={{
                 flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start',
                 marginTop: 8, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6,
@@ -111,10 +109,10 @@ export default function StockDetail() {
               {!isPremium && quoteMeta.delayed && (
                 <>
                   <Text style={{ color: theme.textTertiary, fontSize: 10, marginLeft: 6 }}>·</Text>
-                  <Text style={{ color: theme.textPrimary, fontSize: 10, fontWeight: '600', marginLeft: 6 }}>Get real-time →</Text>
+                  <Text style={{ color: theme.textSecondary, fontSize: 10, fontWeight: '600', marginLeft: 6 }}>Real-time coming soon</Text>
                 </>
               )}
-            </TouchableOpacity>
+            </View>
           )}
         </View>
 
@@ -147,9 +145,8 @@ export default function StockDetail() {
                     key={h.horizon}
                     testID={`horizon-${h.horizon}`}
                     onPress={() => locked
-                      ? Alert.alert('Premium feature', 'Multi-horizon forecasts (1W & 1M) are part of Pav Premium.', [
-                          { text: 'Maybe later', style: 'cancel' },
-                          { text: 'Upgrade', onPress: () => router.push('/(tabs)/settings') },
+                      ? Alert.alert('Coming soon', 'Multi-horizon forecasts (1W & 1M) are part of Pav Premium. Premium subscriptions aren\'t live yet — this feature will unlock soon.', [
+                          { text: 'Got it', style: 'default' },
                         ])
                       : setActiveHorizon(h.horizon)
                     }
@@ -180,8 +177,11 @@ export default function StockDetail() {
                     <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 19 }}>
                       Get AI predictions across multiple timeframes — 1 day, 1 week, and 1 month — with horizon-specific confidence scores and price targets.
                     </Text>
-                    <TouchableOpacity onPress={() => router.push('/(tabs)/settings')} style={{ marginTop: 14, backgroundColor: '#F59E0B', paddingVertical: 12, borderRadius: 999, alignItems: 'center' }}>
-                      <Text style={{ color: '#09090B', fontWeight: '700' }}>Unlock with Premium</Text>
+                    <TouchableOpacity disabled style={{ marginTop: 14, backgroundColor: '#F59E0B', paddingVertical: 12, borderRadius: 999, alignItems: 'center', opacity: 0.85 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Ionicons name="time-outline" size={14} color="#09090B" />
+                        <Text style={{ color: '#09090B', fontWeight: '700', marginLeft: 6 }}>Coming Soon</Text>
+                      </View>
                     </TouchableOpacity>
                   </View>
                 );
@@ -230,8 +230,9 @@ export default function StockDetail() {
             </Text>
             <Text style={{ color: theme.textSecondary, fontSize: 14, lineHeight: 21, marginTop: 12 }}>{pred.narrative}</Text>
             {(pred as any).premium_required && (
-              <TouchableOpacity testID="btn-upgrade-from-stock" onPress={() => router.push('/(tabs)/settings')} style={{ marginTop: 14, backgroundColor: '#F59E0B', paddingVertical: 12, borderRadius: 999, alignItems: 'center' }}>
-                <Text style={{ color: '#09090B', fontWeight: '700' }}>Unlock with Premium</Text>
+              <TouchableOpacity testID="btn-upgrade-from-stock" disabled style={{ marginTop: 14, backgroundColor: '#F59E0B', paddingVertical: 12, borderRadius: 999, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', opacity: 0.85 }}>
+                <Ionicons name="time-outline" size={14} color="#09090B" />
+                <Text style={{ color: '#09090B', fontWeight: '700', marginLeft: 6 }}>Coming Soon</Text>
               </TouchableOpacity>
             )}
           </View>

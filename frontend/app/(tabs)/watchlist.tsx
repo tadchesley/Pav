@@ -70,10 +70,7 @@ export default function Watchlist() {
           testID="btn-compare"
           onPress={() => {
             if (!isPremium) {
-              Alert.alert('Premium feature', 'Side-by-side comparison is part of Pav Premium.', [
-                { text: 'Maybe later', style: 'cancel' },
-                { text: 'Upgrade', onPress: () => router.push('/(tabs)/settings') },
-              ]);
+              Alert.alert('Coming soon', 'Side-by-side comparison is part of Pav Premium. Premium subscriptions aren\'t live yet — this feature will unlock soon.', [{ text: 'Got it' }]);
               return;
             }
             if (items.length < 2) {
@@ -90,10 +87,7 @@ export default function Watchlist() {
           testID="btn-export-watchlist"
           onPress={() => {
             if (!isPremium) {
-              Alert.alert('Premium feature', 'CSV export is part of Pav Premium.', [
-                { text: 'Maybe later', style: 'cancel' },
-                { text: 'Upgrade', onPress: () => router.push('/(tabs)/settings') },
-              ]);
+              Alert.alert('Coming soon', 'CSV export is part of Pav Premium. Premium subscriptions aren\'t live yet — this feature will unlock soon.', [{ text: 'Got it' }]);
               return;
             }
             if (items.length === 0) {

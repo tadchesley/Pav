@@ -201,10 +201,7 @@ export default function Alerts() {
               testID="type-confidence"
               onPress={() => {
                 if (!isPremium) {
-                  Alert.alert('Premium feature', 'AI confidence alerts are part of Pav Premium.', [
-                    { text: 'Maybe later', style: 'cancel' },
-                    { text: 'Upgrade', onPress: () => router.push('/(tabs)/settings') },
-                  ]);
+                  Alert.alert('Coming soon', 'AI confidence alerts are part of Pav Premium. Premium subscriptions aren\'t live yet — this feature will unlock soon.', [{ text: 'Got it' }]);
                   return;
                 }
                 setAlertType('ai_confidence');

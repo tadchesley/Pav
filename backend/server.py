@@ -710,7 +710,8 @@ async def quote(symbol: str, user=Depends(current_user)):
     # Free tier — serve from the screener cache (delayed)
     cache_data = _screener_cache["data"] or []
     cached = next((r for r in cache_data if r["symbol"] == symbol), None)
-    cache_age = int(datetime.now(timezone.utc).timestamp() - (_screener_cache["ts"] or 0))
+    cache_ts = _screener_cache["ts"] or 0
+    cache_age = int(datetime.now(timezone.utc).timestamp() - cache_ts) if cache_ts > 0 else None
     if cached:
         return {
             "symbol": symbol,
@@ -725,7 +726,7 @@ async def quote(symbol: str, user=Depends(current_user)):
             "prev_close": 0,
             "delayed": True,
             "data_source": "cache",
-            "as_of": datetime.fromtimestamp(_screener_cache["ts"] or 0, tz=timezone.utc).isoformat() if _screener_cache["ts"] else None,
+            "as_of": datetime.fromtimestamp(cache_ts, tz=timezone.utc).isoformat() if cache_ts > 0 else None,
             "delayed_seconds": cache_age,
         }
     # Fallback — live but mark delayed
@@ -1189,12 +1190,8 @@ async def delete_alert(alert_id: str, user=Depends(current_user)):
 # ---------- Subscription (mock) ----------
 @api.post("/subscription/upgrade")
 async def upgrade(body: dict, user=Depends(current_user)):
-    plan = body.get("plan", "monthly")
-    if plan not in ("monthly", "yearly"):
-        raise HTTPException(400, "plan must be 'monthly' or 'yearly'")
-    price = 4.99 if plan == "monthly" else 49.99
-    await db.users.update_one({"id": user["id"]}, {"$set": {"tier": "premium", "plan": plan, "plan_price": price}})
-    return {"tier": "premium", "plan": plan, "price": price, "message": "Upgraded (MOCKED — Stripe integration deferred)"}
+    """Disabled until Apple/Google IAP integration is live."""
+    raise HTTPException(503, "Premium subscriptions are not yet available — coming soon!")
 
 
 # ---------- Admin routes ----------

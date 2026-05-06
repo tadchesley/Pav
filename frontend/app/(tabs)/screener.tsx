@@ -37,12 +37,9 @@ export default function Screener() {
 
   const showPaywall = (which: string) => {
     Alert.alert(
-      'Premium feature',
-      `${which} is part of Pav Premium. Upgrade to unlock advanced screener filters, multi-horizon forecasts, AI narratives, and more.`,
-      [
-        { text: 'Maybe later', style: 'cancel' },
-        { text: 'Upgrade', onPress: () => router.push('/(tabs)/settings') },
-      ],
+      'Coming soon',
+      `${which} is part of Pav Premium. Premium subscriptions aren't live yet — this feature will unlock soon.`,
+      [{ text: 'Got it', style: 'default' }],
     );
   };
 

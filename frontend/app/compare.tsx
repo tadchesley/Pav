@@ -49,10 +49,7 @@ export default function Compare() {
       setItems(data.items || []);
     } catch (e: any) {
       if (e?.response?.status === 403) {
-        Alert.alert('Premium feature', 'Side-by-side comparison is part of Pav Premium.', [
-          { text: 'Maybe later', style: 'cancel' },
-          { text: 'Upgrade', onPress: () => router.replace('/(tabs)/settings') },
-        ]);
+        Alert.alert('Coming soon', 'Side-by-side comparison is part of Pav Premium. Premium subscriptions aren\'t live yet — this feature will unlock soon.', [{ text: 'Got it' }]);
         router.back();
       } else {
         Alert.alert('Error', e?.response?.data?.detail || 'Failed to compare');

@@ -40,7 +40,7 @@ export async function exportCsv(endpoint: string, suggestedName: string): Promis
     await Sharing.shareAsync(path, { mimeType: 'text/csv', dialogTitle: 'Export CSV' });
   } catch (e: any) {
     if (e?.response?.status === 403) {
-      Alert.alert('Premium feature', 'CSV export is part of Pav Premium. Upgrade in Settings to unlock.');
+      Alert.alert('Coming soon', 'CSV export is part of Pav Premium. Premium subscriptions aren\'t live yet — this feature will unlock soon.');
     } else {
       Alert.alert('Export failed', e?.response?.data?.detail || e?.message || 'Unknown error');
     }
