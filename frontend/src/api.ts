@@ -18,6 +18,7 @@ export type User = {
   full_name?: string | null;
   tier: string;
   theme: 'dark' | 'light';
+  is_admin?: boolean;
   created_at: string;
 };
 

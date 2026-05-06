@@ -108,6 +108,25 @@ export default function Settings() {
           </Text>
         </View>
 
+        {user?.is_admin && (
+          <>
+            <Text style={[s.sectionTitle, { color: theme.textSecondary }]}>ADMIN</Text>
+            <TouchableOpacity
+              testID="btn-admin-dashboard"
+              onPress={() => router.push('/admin')}
+              style={[s.card, { backgroundColor: theme.surface, borderColor: theme.border, flexDirection: 'row', alignItems: 'center' }]}>
+              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="shield-checkmark" size={18} color={theme.primaryFg} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={{ color: theme.textPrimary, fontWeight: '600' }}>Admin Dashboard</Text>
+                <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 2 }}>Users, subscriptions & analytics</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />
+            </TouchableOpacity>
+          </>
+        )}
+
         <TouchableOpacity testID="btn-signout" onPress={async () => { await signOut(); router.replace('/auth'); }}
           style={[s.card, { backgroundColor: theme.surface, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }]}>
           <Ionicons name="log-out-outline" size={18} color={theme.bearish} />

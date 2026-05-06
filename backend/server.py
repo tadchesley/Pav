@@ -35,6 +35,14 @@ FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY", "")
 JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALGORITHM = os.environ["JWT_ALGORITHM"]
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ["ACCESS_TOKEN_EXPIRE_MINUTES"])
+ADMIN_EMAILS = {e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()}
+
+
+def is_admin_user(user_or_email) -> bool:
+    if not user_or_email:
+        return False
+    email = user_or_email.get("email") if isinstance(user_or_email, dict) else str(user_or_email)
+    return (email or "").lower() in ADMIN_EMAILS
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
@@ -73,6 +81,7 @@ class UserOut(BaseModel):
     full_name: Optional[str] = None
     tier: str = "free"
     theme: str = "dark"
+    is_admin: bool = False
     created_at: datetime
 
 class AuthResp(BaseModel):
@@ -109,6 +118,7 @@ def user_to_out(doc: dict) -> UserOut:
         full_name=doc.get("full_name"),
         tier=doc.get("tier", "free"),
         theme=doc.get("theme", "dark"),
+        is_admin=is_admin_user(doc),
         created_at=doc["created_at"],
     )
 
@@ -912,6 +922,159 @@ async def upgrade(body: dict, user=Depends(current_user)):
     price = 4.99 if plan == "monthly" else 49.99
     await db.users.update_one({"id": user["id"]}, {"$set": {"tier": "premium", "plan": plan, "plan_price": price}})
     return {"tier": "premium", "plan": plan, "price": price, "message": "Upgraded (MOCKED — Stripe integration deferred)"}
+
+
+# ---------- Admin routes ----------
+async def require_admin(user=Depends(current_user)):
+    if not is_admin_user(user):
+        raise HTTPException(403, "Admin access required")
+    return user
+
+
+@api.get("/admin/stats")
+async def admin_stats(_=Depends(require_admin)):
+    """High-level platform metrics for the admin dashboard."""
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    seven_days_ago = now - timedelta(days=7)
+    thirty_days_ago = now - timedelta(days=30)
+
+    total_users = await db.users.count_documents({})
+    premium_users = await db.users.count_documents({"tier": "premium"})
+    free_users = total_users - premium_users
+    monthly_subs = await db.users.count_documents({"tier": "premium", "plan": "monthly"})
+    yearly_subs = await db.users.count_documents({"tier": "premium", "plan": "yearly"})
+    legacy_subs = max(0, premium_users - monthly_subs - yearly_subs)
+    signups_today = await db.users.count_documents({"created_at": {"$gte": today_start}})
+    signups_7d = await db.users.count_documents({"created_at": {"$gte": seven_days_ago}})
+    signups_30d = await db.users.count_documents({"created_at": {"$gte": thirty_days_ago}})
+
+    active_alerts = await db.alerts.count_documents({"status": {"$ne": "removed"}})
+    total_watchlist = await db.watchlist.count_documents({})
+
+    # MRR — assume legacy premium = monthly for estimation
+    mrr = (monthly_subs + legacy_subs) * 4.99 + (yearly_subs * 49.99 / 12)
+    arr = mrr * 12
+
+    # Provider breakdown (email/google/apple)
+    by_provider: Dict[str, int] = {}
+    async for d in db.users.aggregate([{"$group": {"_id": "$provider", "n": {"$sum": 1}}}]):
+        by_provider[d["_id"] or "email"] = d["n"]
+
+    return {
+        "users": {
+            "total": total_users,
+            "free": free_users,
+            "premium": premium_users,
+            "monthly_subs": monthly_subs,
+            "yearly_subs": yearly_subs,
+            "by_provider": by_provider,
+        },
+        "signups": {
+            "today": signups_today,
+            "last_7_days": signups_7d,
+            "last_30_days": signups_30d,
+        },
+        "engagement": {
+            "active_alerts": active_alerts,
+            "total_watchlist": total_watchlist,
+        },
+        "revenue": {
+            "mrr": round(mrr, 2),
+            "arr": round(arr, 2),
+            "currency": "USD",
+            "note": "Estimated from current premium subscriber counts",
+        },
+        "generated_at": now.isoformat(),
+    }
+
+
+@api.get("/admin/signups_chart")
+async def admin_signups_chart(days: int = 30, _=Depends(require_admin)):
+    """Daily signup counts for the last N days (default 30)."""
+    days = max(1, min(days, 90))
+    now = datetime.now(timezone.utc)
+    start = (now - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    pipeline = [
+        {"$match": {"created_at": {"$gte": start}}},
+        {"$group": {
+            "_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$created_at"}},
+            "count": {"$sum": 1},
+        }},
+    ]
+    raw: Dict[str, int] = {}
+    async for d in db.users.aggregate(pipeline):
+        raw[d["_id"]] = d["count"]
+
+    out = []
+    for i in range(days):
+        d = (start + timedelta(days=i)).strftime("%Y-%m-%d")
+        out.append({"date": d, "count": raw.get(d, 0)})
+    return {"days": days, "series": out}
+
+
+@api.get("/admin/users")
+async def admin_list_users(q: Optional[str] = None, limit: int = 50, offset: int = 0, _=Depends(require_admin)):
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
+    flt: Dict[str, Any] = {}
+    if q:
+        flt = {"$or": [
+            {"email": {"$regex": q, "$options": "i"}},
+            {"full_name": {"$regex": q, "$options": "i"}},
+        ]}
+    total = await db.users.count_documents(flt)
+    cursor = db.users.find(flt, {"_id": 0, "password_hash": 0}).sort("created_at", -1).skip(offset).limit(limit)
+    items = []
+    async for u in cursor:
+        items.append({
+            "id": u["id"],
+            "email": u["email"],
+            "full_name": u.get("full_name"),
+            "tier": u.get("tier", "free"),
+            "plan": u.get("plan"),
+            "provider": u.get("provider", "email"),
+            "is_admin": is_admin_user(u),
+            "created_at": u["created_at"].isoformat() if isinstance(u.get("created_at"), datetime) else u.get("created_at"),
+        })
+    return {"total": total, "limit": limit, "offset": offset, "items": items}
+
+
+@api.post("/admin/users/{user_id}/tier")
+async def admin_set_tier(user_id: str, body: dict, _=Depends(require_admin)):
+    """Manually set a user's tier (free / premium). For ops use only."""
+    new_tier = (body.get("tier") or "").lower()
+    if new_tier not in ("free", "premium"):
+        raise HTTPException(400, "tier must be 'free' or 'premium'")
+    plan = body.get("plan")
+    update = {"tier": new_tier}
+    if new_tier == "premium":
+        if plan not in ("monthly", "yearly"):
+            plan = "monthly"
+        update["plan"] = plan
+        update["plan_price"] = 4.99 if plan == "monthly" else 49.99
+    else:
+        update["plan"] = None
+        update["plan_price"] = None
+    res = await db.users.update_one({"id": user_id}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(404, "User not found")
+    return {"id": user_id, "tier": new_tier, "plan": plan if new_tier == "premium" else None}
+
+
+@api.get("/admin/top_watched")
+async def admin_top_watched(limit: int = 10, _=Depends(require_admin)):
+    limit = max(1, min(limit, 50))
+    pipeline = [
+        {"$group": {"_id": "$symbol", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": limit},
+    ]
+    items = []
+    async for d in db.watchlist.aggregate(pipeline):
+        items.append({"symbol": d["_id"], "count": d["count"]})
+    return {"items": items}
 
 
 # ---------- Startup ----------
