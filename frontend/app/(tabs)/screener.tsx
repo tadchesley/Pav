@@ -155,7 +155,7 @@ export default function Screener() {
     <SafeAreaView style={s.safe} testID="screener-screen">
       <View style={s.header}>
         <Text style={[s.title, { color: theme.textPrimary }]}>Screener</Text>
-        <Text style={[s.subtitle, { color: theme.textSecondary }]}>AI-ranked predictions across {all.length} symbols</Text>
+        <Text style={[s.subtitle, { color: theme.textSecondary }]}>AI-ranked predictions across {all.length || 871} symbols</Text>
       </View>
 
       {loading ? (

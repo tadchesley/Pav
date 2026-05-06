@@ -58,6 +58,15 @@ class SocialReq(BaseModel):
     email: EmailStr
     full_name: Optional[str] = None
 
+class ProfileUpdateReq(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    current_password: Optional[str] = None  # required if changing email
+
+class PasswordChangeReq(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=6)
+
 class UserOut(BaseModel):
     id: str
     email: str
@@ -119,7 +128,7 @@ async def current_user(cred: HTTPAuthorizationCredentials = Depends(security)):
 # ---------- Finnhub service ----------
 FINNHUB_BASE = "https://finnhub.io/api/v1"
 
-# Top 100 by market cap (curated mega-caps + popular liquid names) — used for screener/dashboard pre-computed predictions
+# Top 100 by market cap (curated mega-caps + popular liquid names) — used for dashboard movers (fast)
 SCREENER_UNIVERSE_SYMBOLS = [
     "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "BRK.B", "AVGO", "LLY",
     "JPM", "V", "XOM", "UNH", "MA", "PG", "JNJ", "HD", "COST", "ORCL",
@@ -132,6 +141,13 @@ SCREENER_UNIVERSE_SYMBOLS = [
     "TSM", "ASML", "BABA", "NVO", "SHEL", "TM", "BHP", "AZN", "NVS", "UL",
     "SPY", "QQQ", "VOO", "IVV", "VTI", "DIA", "IWM", "GLD", "TLT", "XLK",
 ]
+
+# Full universe = ALL 871 tickers (used for screener)
+ALL_UNIVERSE_SYMBOLS = list(TICKERS_DICT.keys())
+
+# In-memory screener cache (5-min TTL)
+_screener_cache: dict = {"data": None, "ts": 0}
+_SCREENER_CACHE_TTL = 300
 
 # Use ticker list as the primary ticker source
 SEED_BY_SYMBOL = TICKERS_DICT
@@ -537,6 +553,40 @@ async def my_limits(user=Depends(current_user)):
     }
 
 
+@api.put("/auth/profile", response_model=UserOut)
+async def update_profile(req: ProfileUpdateReq, user=Depends(current_user)):
+    full = await db.users.find_one({"id": user["id"]})
+    updates: dict = {}
+    if req.full_name is not None:
+        updates["full_name"] = req.full_name
+    if req.email and req.email.lower() != user["email"]:
+        # Email change requires current password verification (for email-tier users)
+        if full and full.get("password_hash"):
+            if not req.current_password or not verify_pw(req.current_password, full["password_hash"]):
+                raise HTTPException(401, "Current password is required to change email")
+        # Ensure email isn't taken
+        existing = await db.users.find_one({"email": req.email.lower()})
+        if existing and existing["id"] != user["id"]:
+            raise HTTPException(400, "Email already in use")
+        updates["email"] = req.email.lower()
+    if updates:
+        await db.users.update_one({"id": user["id"]}, {"$set": updates})
+    refreshed = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    return user_to_out(refreshed)
+
+
+@api.put("/auth/password")
+async def change_password(req: PasswordChangeReq, user=Depends(current_user)):
+    # Fetch full record (current_user excludes password_hash)
+    full = await db.users.find_one({"id": user["id"]})
+    if not full or not full.get("password_hash"):
+        raise HTTPException(400, "Account uses social sign-in — no password to change")
+    if not verify_pw(req.current_password, full["password_hash"]):
+        raise HTTPException(401, "Current password is incorrect")
+    await db.users.update_one({"id": user["id"]}, {"$set": {"password_hash": hash_pw(req.new_password)}})
+    return {"status": "password_updated"}
+
+
 @api.put("/auth/theme")
 async def update_theme(body: dict, user=Depends(current_user)):
     theme = body.get("theme", "dark")
@@ -688,17 +738,34 @@ async def top_movers(user=Depends(current_user)):
 
 @api.post("/predictions/screener")
 async def screener(body: dict, user=Depends(current_user)):
+    """Returns predictions for ALL 871 tickers, cached 5 minutes for performance."""
     min_conf = body.get("min_confidence", 0)
     min_return = body.get("min_return", -100)
     direction = body.get("direction")
     sector = body.get("sector")
 
-    tasks = [build_prediction(s, use_llm=False) for s in SCREENER_UNIVERSE_SYMBOLS]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    now = datetime.now(timezone.utc).timestamp()
+    if _screener_cache["data"] is None or (now - _screener_cache["ts"]) > _SCREENER_CACHE_TTL:
+        # Rebuild cache — process in chunks of 50 to avoid overwhelming Finnhub rate limits
+        all_results: list = []
+        chunk_size = 50
+        for i in range(0, len(ALL_UNIVERSE_SYMBOLS), chunk_size):
+            chunk = ALL_UNIVERSE_SYMBOLS[i:i + chunk_size]
+            chunk_results = await asyncio.gather(
+                *[build_prediction(s, use_llm=False) for s in chunk],
+                return_exceptions=True,
+            )
+            all_results.extend(chunk_results)
+        valid = [
+            {k: v for k, v in r.items() if k not in ("indicators", "narrative", "key_factors", "risks", "feature_importance")}
+            for r in all_results if isinstance(r, dict)
+        ]
+        _screener_cache["data"] = valid
+        _screener_cache["ts"] = now
+        logger.info(f"Screener cache rebuilt: {len(valid)} predictions")
+
     out = []
-    for r in results:
-        if not isinstance(r, dict):
-            continue
+    for r in _screener_cache["data"]:
         if r["confidence"] < min_conf:
             continue
         if r["expected_return_pct"] < min_return:
@@ -707,9 +774,9 @@ async def screener(body: dict, user=Depends(current_user)):
             continue
         if sector and r.get("sector") != sector:
             continue
-        out.append({k: v for k, v in r.items() if k not in ("indicators", "narrative", "key_factors", "risks", "feature_importance")})
+        out.append(r)
     out.sort(key=lambda x: -x["ai_score"])
-    return {"results": out}
+    return {"results": out, "cache_age_seconds": int(now - _screener_cache["ts"])}
 
 
 # ---------- Watchlist ----------

@@ -58,6 +58,15 @@ export default function Settings() {
           </View>
         </View>
 
+        <TouchableOpacity testID="btn-account" onPress={() => router.push('/account')} style={[s.card, { backgroundColor: theme.surface, borderColor: theme.border, flexDirection: 'row', alignItems: 'center' }]}>
+          <Ionicons name="person-circle" size={22} color={theme.textPrimary} />
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={{ color: theme.textPrimary, fontWeight: '600' }}>Account</Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 2 }}>Edit name, email, password & view payment method</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+        </TouchableOpacity>
+
         {user?.tier !== 'premium' && (
           <TouchableOpacity testID="btn-upgrade" onPress={() => setPaywall(true)} style={[s.card, { backgroundColor: theme.surface, borderColor: theme.border, flexDirection: 'row', alignItems: 'center' }]}>
             <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: theme.neutralBg, alignItems: 'center', justifyContent: 'center' }}>
