@@ -96,6 +96,7 @@ class AlertCreate(BaseModel):
     symbol: str
     target_price: float
     direction: str  # "above" or "below"
+    type: Optional[str] = "price"  # "price" or "ai_confidence"
 
 # ---------- Auth helpers ----------
 def hash_pw(p: str) -> str:
@@ -680,10 +681,55 @@ async def search_stocks(q: str):
 
 
 @api.get("/stocks/quote/{symbol}")
-async def quote(symbol: str):
+async def quote(symbol: str, user=Depends(current_user)):
+    """Return a quote. Free tier gets quotes from the warmer cache (delayed up to ~15 min);
+    Premium gets live Finnhub quotes.
+    """
     symbol = symbol.upper()
-    q = await get_quote(symbol)
     seed = TICKERS_DICT.get(symbol, {})
+    is_premium = user.get("tier") == "premium"
+
+    if is_premium:
+        q = await get_quote(symbol)
+        return {
+            "symbol": symbol,
+            "name": seed.get("name", symbol),
+            "sector": seed.get("sector"),
+            "price": q.get("c", 0),
+            "change": q.get("d", 0),
+            "change_pct": q.get("dp", 0),
+            "high": q.get("h", 0),
+            "low": q.get("l", 0),
+            "open": q.get("o", 0),
+            "prev_close": q.get("pc", 0),
+            "delayed": False,
+            "data_source": "live",
+            "as_of": datetime.now(timezone.utc).isoformat(),
+        }
+
+    # Free tier — serve from the screener cache (delayed)
+    cache_data = _screener_cache["data"] or []
+    cached = next((r for r in cache_data if r["symbol"] == symbol), None)
+    cache_age = int(datetime.now(timezone.utc).timestamp() - (_screener_cache["ts"] or 0))
+    if cached:
+        return {
+            "symbol": symbol,
+            "name": cached.get("name", symbol),
+            "sector": cached.get("sector"),
+            "price": cached.get("current_price", 0),
+            "change": 0,
+            "change_pct": 0,
+            "high": 0,
+            "low": 0,
+            "open": 0,
+            "prev_close": 0,
+            "delayed": True,
+            "data_source": "cache",
+            "as_of": datetime.fromtimestamp(_screener_cache["ts"] or 0, tz=timezone.utc).isoformat() if _screener_cache["ts"] else None,
+            "delayed_seconds": cache_age,
+        }
+    # Fallback — live but mark delayed
+    q = await get_quote(symbol)
     return {
         "symbol": symbol,
         "name": seed.get("name", symbol),
@@ -695,6 +741,9 @@ async def quote(symbol: str):
         "low": q.get("l", 0),
         "open": q.get("o", 0),
         "prev_close": q.get("pc", 0),
+        "delayed": True,
+        "data_source": "live-fallback",
+        "as_of": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -1074,13 +1123,22 @@ async def get_alerts(user=Depends(current_user)):
     # evaluate trigger status
     symbols = list({a["symbol"] for a in items if a.get("status") == "active"})
     quotes_map = {}
+    cache_data = _screener_cache["data"] or []
+    cache_by_sym = {r["symbol"]: r for r in cache_data}
     for s in symbols:
         q = await get_quote(s)
         quotes_map[s] = q.get("c", 0)
     for a in items:
         current = quotes_map.get(a["symbol"], 0)
         a["current_price"] = current
-        if a["status"] == "active":
+        a_type = a.get("type", "price")
+        if a_type == "ai_confidence":
+            cached = cache_by_sym.get(a["symbol"], {})
+            a["current_confidence"] = cached.get("confidence", 0)
+            if a["status"] == "active":
+                if a["direction"] == "above" and a["current_confidence"] >= a["target_price"]:
+                    a["triggered"] = True
+        elif a["status"] == "active":
             triggered = (a["direction"] == "above" and current >= a["target_price"]) or \
                         (a["direction"] == "below" and current <= a["target_price"])
             if triggered:
@@ -1092,6 +1150,16 @@ async def get_alerts(user=Depends(current_user)):
 async def create_alert(req: AlertCreate, user=Depends(current_user)):
     if req.direction not in ("above", "below"):
         raise HTTPException(400, "direction must be 'above' or 'below'")
+    a_type = req.type or "price"
+    if a_type not in ("price", "ai_confidence"):
+        raise HTTPException(400, "type must be 'price' or 'ai_confidence'")
+    if a_type == "ai_confidence":
+        if user.get("tier") != "premium":
+            raise HTTPException(403, "AI confidence alerts are a Premium feature.")
+        if req.direction != "above":
+            raise HTTPException(400, "AI confidence alerts only support direction='above'")
+        if not (0 < req.target_price <= 1):
+            raise HTTPException(400, "AI confidence target must be between 0 and 1 (e.g. 0.8 for 80%)")
     limits = get_limits(user)
     active = await db.alerts.count_documents({"user_id": user["id"], "status": "active"})
     if active >= limits["alerts_max"]:
@@ -1102,6 +1170,7 @@ async def create_alert(req: AlertCreate, user=Depends(current_user)):
         "symbol": req.symbol.upper(),
         "target_price": req.target_price,
         "direction": req.direction,
+        "type": a_type,
         "status": "active",
         "created_at": datetime.now(timezone.utc),
     }

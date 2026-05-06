@@ -114,6 +114,69 @@ user_problem_statement: |
   - Ability to manually upgrade/downgrade a user's tier (free/premium-monthly/premium-yearly)
 
 backend:
+  - task: "Round 3 Premium: AI confidence alerts + delayed/live quote split"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: |
+            Backend changes:
+            1. AlertCreate model now has optional 'type' field ("price" | "ai_confidence", default "price").
+            2. POST /api/alerts validates new type. ai_confidence requires premium; direction must be "above";
+               target_price is a fraction 0<x<=1 (0.8 = 80%).
+            3. GET /api/alerts evaluation now handles ai_confidence alerts using the screener cache's
+               confidence value for the symbol; sets current_confidence on the response.
+            4. GET /api/stocks/quote/{symbol} now requires auth and:
+               - Premium: live Finnhub quote, delayed:false, data_source:"live"
+               - Free: cache-served quote (delayed up to ~screener cache age), delayed:true,
+                 data_source:"cache" + delayed_seconds field. Falls back to "live-fallback" (still
+                 marked delayed) when symbol not in cache.
+        -working: true
+        -agent: "testing"
+        -comment: |
+            Round-3 Premium test suite (/app/backend_test_round3.py) — 42/42 PASS against public URL.
+
+            A. Quote split GET /api/stocks/quote/AAPL (12/12):
+              - Anonymous (no Authorization header) → 401 ✓
+              - FREE user (fresh signup q+xxx@example.com) → 200 with delayed=true,
+                data_source="cache", as_of valid ISO 8601 (2026-05-06T10:45:44.583643+00:00),
+                price=284.18 (from warm screener cache of 871 tickers) ✓
+              - Admin POST /admin/users/{id}/tier {tier:premium,plan:monthly} → 200 ✓
+              - Re-login as q user, tier=premium ✓
+              - PREMIUM user → 200 with delayed=false, data_source="live", price=284.18,
+                full quote fields populated (change=7.35, change_pct=2.66, high/low/open/prev_close
+                all non-zero from live Finnhub) ✓
+
+            B. AI confidence alerts POST /api/alerts (15/15):
+              - FREE user (demoted) + body {symbol:AAPL, target_price:0.8, direction:above,
+                type:ai_confidence} → 403 "AI confidence alerts are a Premium feature." ✓
+              - Re-promoted to premium. Same body → 200 with type="ai_confidence",
+                target_price=0.8, direction="above", status="active", id+user_id+created_at present ✓
+              - direction:"below" → 400 "AI confidence alerts only support direction='above'" ✓
+              - target_price:1.5 → 400 "AI confidence target must be between 0 and 1 (e.g. 0.8 for 80%)" ✓
+              - target_price:85 → 400 (same message) ✓
+              - type:"bogus" → 400 "type must be 'price' or 'ai_confidence'" ✓
+              - Default type (no type field) {target_price:50, direction:above} → 200,
+                response type="price" (price alert created normally) ✓
+              - GET /api/alerts → 200, found 1 ai_confidence alert with current_confidence=0.68
+                (numeric, in [0,1] range), type=="ai_confidence" ✓
+
+            C. Regression (8/8):
+              - GET /predictions/AAPL/horizons (premium) → 200, 3 horizons [1D,1W,1M],
+                all 3 unlocked (locked=false) ✓
+              - POST /predictions/screener (premium) → 200, 871 results in cache ✓
+              - GET /admin/stats (admin) → 200 ✓
+              - POST /predictions/compare {symbols:[AAPL,MSFT]} (premium) → 200 with count=2,
+                items length=2 ✓
+              - GET /exports/screener.csv (premium) → 200 with content-type "text/csv; charset=utf-8" ✓
+
+            All Round-3 Premium endpoints working as specified. No backend issues found.
+
   - task: "Round 2 Premium: side-by-side compare + CSV exports"
     implemented: true
     working: true
@@ -295,8 +358,7 @@ metadata:
   test_sequence: 0
 
 test_plan:
-  current_focus:
-    - "Premium gating: screener filters + multi-horizon forecasts"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -401,3 +463,34 @@ agent_communication:
         I did NOT apply the fix (per testing-agent guidelines — main agent's responsibility to fix).
         
         Round-2 new endpoints (compare + CSV exports) themselves are fully working and ready to ship.
+    -agent: "testing"
+    -message: |
+        Round-3 Premium test suite (/app/backend_test_round3.py) — 42/42 PASS against public URL.
+
+        A. Quote split GET /api/stocks/quote/{symbol} (12/12):
+          - Anonymous → 401.
+          - FREE (fresh signup q+xxx@example.com / test123456) → 200 with delayed=true,
+            data_source="cache", as_of valid ISO 8601, price=284.18 (from warm 871-ticker cache).
+          - Admin upgrade {tier:premium,plan:monthly} + re-login → tier=premium.
+          - PREMIUM → 200 with delayed=false, data_source="live", price=284.18 + change/change_pct/
+            high/low/open/prev_close all populated (Finnhub live).
+
+        B. AI confidence alerts POST /api/alerts (15/15):
+          - FREE (demoted) + body {symbol:AAPL,target_price:0.8,direction:above,type:ai_confidence}
+            → 403 "AI confidence alerts are a Premium feature."
+          - Re-promoted to premium. Same body → 200 with type="ai_confidence", target_price=0.8,
+            direction="above", status="active".
+          - direction:"below" → 400 ("only support direction='above'").
+          - target_price:1.5 → 400; target_price:85 → 400 (must be 0..1).
+          - type:"bogus" → 400 ("type must be 'price' or 'ai_confidence'").
+          - Default type, normal price alert → 200 with type="price".
+          - GET /api/alerts → 200, ai_confidence alert has current_confidence=0.68 (number 0..1).
+
+        C. Regression (8/8):
+          - GET /predictions/AAPL/horizons (premium) → 200 with 3 unlocked horizons.
+          - POST /predictions/screener → 200 (871 results).
+          - GET /admin/stats → 200.
+          - POST /predictions/compare {symbols:[AAPL,MSFT]} → 200 count=2.
+          - GET /exports/screener.csv → 200 text/csv.
+
+        No backend issues found. All Round-3 Premium endpoints work as specified.

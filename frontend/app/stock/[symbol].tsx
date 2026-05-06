@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api, Prediction } from '../../src/api';
 import { useTheme } from '../../src/ThemeContext';
+import { useAuth } from '../../src/AuthContext';
 import { PriceChart } from '../../src/Charts';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -13,9 +14,12 @@ export default function StockDetail() {
   const { symbol } = useLocalSearchParams<{ symbol: string }>();
   const { theme } = useTheme();
   const router = useRouter();
+  const { user } = useAuth();
+  const isPremium = user?.tier === 'premium';
   const [pred, setPred] = useState<Prediction | null>(null);
   const [candles, setCandles] = useState<any>(null);
   const [horizons, setHorizons] = useState<any[]>([]);
+  const [quoteMeta, setQuoteMeta] = useState<{ delayed: boolean; delayed_seconds?: number } | null>(null);
   const [activeHorizon, setActiveHorizon] = useState<string>('1M');
   const [loading, setLoading] = useState(true);
   const [inWatch, setInWatch] = useState(false);
@@ -24,16 +28,18 @@ export default function StockDetail() {
     if (!symbol) return;
     setLoading(true);
     try {
-      const [p, c, w, h] = await Promise.all([
+      const [p, c, w, h, q] = await Promise.all([
         api.get(`/predictions/${symbol}?deep=true`),
         api.get(`/stocks/candles/${symbol}?days=60`),
         api.get('/watchlist'),
         api.get(`/predictions/${symbol}/horizons`),
+        api.get(`/stocks/quote/${symbol}`),
       ]);
       setPred(p.data);
       setCandles(c.data);
       setInWatch(w.data.items.some((x: any) => x.symbol === symbol));
       setHorizons(h.data.horizons || []);
+      setQuoteMeta({ delayed: !!q.data.delayed, delayed_seconds: q.data.delayed_seconds });
     } catch (e: any) {
       Alert.alert('Error', e?.response?.data?.detail || 'Failed to load');
     } finally { setLoading(false); }
@@ -82,6 +88,34 @@ export default function StockDetail() {
               {pred.expected_return_pct > 0 ? '+' : ''}{pred.expected_return_pct.toFixed(2)}% · 30d
             </Text>
           </View>
+
+          {/* Live / Delayed badge */}
+          {quoteMeta && (
+            <TouchableOpacity
+              onPress={() => !isPremium && router.push('/(tabs)/settings')}
+              activeOpacity={isPremium ? 1 : 0.7}
+              style={{
+                flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start',
+                marginTop: 8, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6,
+                backgroundColor: quoteMeta.delayed ? theme.neutralBg : theme.bullishBg,
+              }}>
+              <View style={{
+                width: 6, height: 6, borderRadius: 3,
+                backgroundColor: quoteMeta.delayed ? theme.neutral : theme.bullish, marginRight: 6,
+              }} />
+              <Text style={{ color: quoteMeta.delayed ? theme.neutral : theme.bullish, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 }}>
+                {quoteMeta.delayed
+                  ? `DELAYED${quoteMeta.delayed_seconds ? ` ~${Math.round(quoteMeta.delayed_seconds / 60)}m` : ''}`
+                  : 'LIVE'}
+              </Text>
+              {!isPremium && quoteMeta.delayed && (
+                <>
+                  <Text style={{ color: theme.textTertiary, fontSize: 10, marginLeft: 6 }}>·</Text>
+                  <Text style={{ color: theme.textPrimary, fontSize: 10, fontWeight: '600', marginLeft: 6 }}>Get real-time →</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
 
         {candles?.close?.length > 0 && (
