@@ -48,6 +48,17 @@ export default function Alerts() {
     ]);
   };
 
+  const lastTapRef = React.useRef<{ id: string; time: number }>({ id: '', time: 0 });
+  const handleDoubleTap = (id: string) => {
+    const now = Date.now();
+    if (lastTapRef.current.id === id && now - lastTapRef.current.time < 350) {
+      lastTapRef.current = { id: '', time: 0 };
+      remove(id);
+    } else {
+      lastTapRef.current = { id, time: now };
+    }
+  };
+
   const s = styles(theme);
 
   return (
@@ -80,7 +91,7 @@ export default function Alerts() {
               ? Math.min(1, item.current_price / item.target_price)
               : Math.min(1, item.target_price / Math.max(item.current_price, 0.01));
             return (
-              <TouchableOpacity testID={`alert-${item.id}`} onLongPress={() => remove(item.id)} style={[s.row, { borderColor: theme.border, backgroundColor: theme.surface }]}>
+              <TouchableOpacity testID={`alert-${item.id}`} activeOpacity={0.7} onPress={() => handleDoubleTap(item.id)} style={[s.row, { borderColor: theme.border, backgroundColor: theme.surface }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                   <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 16, flex: 1 }}>{item.symbol}</Text>
                   {triggered ? (
@@ -98,7 +109,7 @@ export default function Alerts() {
                 <View style={{ marginTop: 10, height: 4, backgroundColor: theme.border, borderRadius: 2, overflow: 'hidden' }}>
                   <View style={{ width: `${progress * 100}%`, height: '100%', backgroundColor: triggered ? theme.bullish : theme.neutral }} />
                 </View>
-                <Text style={{ color: theme.textTertiary, fontSize: 10, marginTop: 6 }}>Long-press to delete</Text>
+                <Text style={{ color: theme.textTertiary, fontSize: 10, marginTop: 6 }}>Double-tap to delete</Text>
               </TouchableOpacity>
             );
           }}
