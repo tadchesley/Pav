@@ -3,7 +3,7 @@ import os
 import requests
 import sys
 
-BASE = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://market-forecast-ai-12.preview.emergentagent.com").rstrip("/")
+BASE = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://pav-website.preview.emergentagent.com").rstrip("/")
 API = f"{BASE}/api"
 
 DEMO_EMAIL = "demo@alphapulse.app"

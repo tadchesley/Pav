@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 
 import requests
 
-BASE = "https://market-forecast-ai-12.preview.emergentagent.com/api"
+BASE = "https://pav-website.preview.emergentagent.com/api"
 
 ADMIN_EMAIL = "demo@alphapulse.app"
 ADMIN_PASS = "demo12345"
