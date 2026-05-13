@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Logo } from './Logo';
+import { ComingSoonButton } from './ComingSoonButton';
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -37,9 +38,9 @@ export function Navbar() {
             FAQ
           </Link>
         </div>
-        <Link href="/#pricing" className="btn-primary !py-2 !px-4 text-sm">
+        <ComingSoonButton variant="primary" className="!py-2 !px-4 text-sm">
           Get Pav
-        </Link>
+        </ComingSoonButton>
       </nav>
     </header>
   );

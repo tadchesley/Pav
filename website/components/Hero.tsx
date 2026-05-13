@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { Logo } from './Logo';
+import { ComingSoonButton } from './ComingSoonButton';
 
 export function Hero() {
   return (
@@ -24,10 +25,9 @@ export function Hero() {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-          <Link href="/#pricing" className="btn-primary w-full sm:w-auto">
+          <ComingSoonButton variant="primary" className="w-full sm:w-auto" withArrow>
             Get Pav
-            <ArrowRight className="w-4 h-4" />
-          </Link>
+          </ComingSoonButton>
           <Link href="/#how-it-works" className="btn-secondary w-full sm:w-auto">
             See how it works
           </Link>

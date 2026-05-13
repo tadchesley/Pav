@@ -1,5 +1,5 @@
 import { Check, Sparkles } from 'lucide-react';
-import Link from 'next/link';
+import { ComingSoonButton } from './ComingSoonButton';
 
 const freeFeatures = [
   'Up to 15 symbols on watchlist',
@@ -45,9 +45,9 @@ export function Pricing() {
               <span className="text-5xl font-bold text-text-primary">$0</span>
               <span className="text-text-tertiary ml-2">/ forever</span>
             </div>
-            <Link href="/#" className="btn-secondary w-full mb-8">
+            <ComingSoonButton variant="secondary" className="w-full mb-8">
               Download Pav
-            </Link>
+            </ComingSoonButton>
             <ul className="space-y-3">
               {freeFeatures.map((f) => (
                 <li key={f} className="flex items-start gap-3 text-sm text-text-secondary">

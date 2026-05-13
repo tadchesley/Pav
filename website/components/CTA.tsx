@@ -1,6 +1,5 @@
-import { ArrowRight } from 'lucide-react';
-import Link from 'next/link';
 import { Logo } from './Logo';
+import { ComingSoonButton } from './ComingSoonButton';
 
 export function CTA() {
   return (
@@ -22,10 +21,9 @@ export function CTA() {
               Download Pav and start exploring AI-powered predictions across 871 tickers — completely free.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link href="/#pricing" className="btn-primary">
+              <ComingSoonButton variant="primary" withArrow>
                 Get Pav free
-                <ArrowRight className="w-4 h-4" />
-              </Link>
+              </ComingSoonButton>
             </div>
           </div>
         </div>
