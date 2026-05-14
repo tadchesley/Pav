@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api, Prediction } from '../../src/api';
 import { useTheme } from '../../src/ThemeContext';
 import { useAuth } from '../../src/AuthContext';
-import { PriceChart } from '../../src/Charts';
+import { PriceChart, ChartDateAxis } from '../../src/Charts';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -21,6 +21,7 @@ export default function StockDetail() {
   const [horizons, setHorizons] = useState<any[]>([]);
   const [quoteMeta, setQuoteMeta] = useState<{ delayed: boolean; delayed_seconds?: number } | null>(null);
   const [activeHorizon, setActiveHorizon] = useState<string>('1D');
+  const [showPremiumHorizons, setShowPremiumHorizons] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [inWatch, setInWatch] = useState(false);
 
@@ -120,112 +121,160 @@ export default function StockDetail() {
           )}
         </View>
 
-        {candles?.close?.length > 0 && (
-          <View style={{ marginTop: 20, paddingHorizontal: 16 }}>
-            <PriceChart
-              data={candles.close}
-              width={SCREEN_W - 32}
-              height={200}
-              color={color}
-              predictedPrice={pred.target_price}
-              bgColor={theme.surface}
-            />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
-              <Text style={{ color: theme.textTertiary, fontSize: 11 }}>60d history · dashed = AI forecast</Text>
-              <Text style={{ color, fontSize: 11, fontWeight: '600' }}>Target ${pred.target_price.toFixed(2)}</Text>
+        {candles?.close?.length > 0 && (() => {
+          const currentHorizon = horizons.find((h: any) => h.horizon === activeHorizon);
+          const horizonDays = currentHorizon?.days || 30;
+          const horizonTarget = currentHorizon && !currentHorizon.locked ? currentHorizon.target_price : pred.target_price;
+          const horizonColor = currentHorizon && !currentHorizon.locked
+            ? (currentHorizon.direction === 'UP' ? theme.bullish : currentHorizon.direction === 'DOWN' ? theme.bearish : theme.neutral)
+            : color;
+          const horizonLabel = currentHorizon?.label || '30d';
+          return (
+            <View style={{ marginTop: 20, paddingHorizontal: 16 }}>
+              <PriceChart
+                data={candles.close}
+                width={SCREEN_W - 32}
+                height={200}
+                color={horizonColor}
+                predictedPrice={horizonTarget}
+                bgColor={theme.surface}
+              />
+              <ChartDateAxis
+                timestamps={candles.timestamps || []}
+                width={SCREEN_W - 32}
+                color={theme.textTertiary}
+                targetColor={horizonColor}
+                horizonDays={horizonDays}
+                hasForecast={!!horizonTarget}
+              />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+                <Text style={{ color: theme.textTertiary, fontSize: 11 }}>60d history · dashed = AI forecast ({horizonLabel})</Text>
+                <Text style={{ color: horizonColor, fontSize: 11, fontWeight: '600' }}>Target ${horizonTarget?.toFixed(2)}</Text>
+              </View>
             </View>
-          </View>
-        )}
+          );
+        })()}
 
-        {horizons.length > 0 && (
-          <View style={{ marginTop: 24, paddingHorizontal: 16 }}>
-            <Text style={[s.cardLabel, { color: theme.textSecondary, marginBottom: 10 }]}>FORECAST HORIZON</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-              {horizons.map((h: any) => {
-                const active = activeHorizon === h.horizon;
-                const locked = !!h.locked;
-                return (
-                  <TouchableOpacity
-                    key={h.horizon}
-                    testID={`horizon-${h.horizon}`}
-                    onPress={() => locked
-                      ? Alert.alert('Coming soon', 'Multi-horizon forecasts (1W & 1M) are part of Pav Premium. Premium subscriptions aren\'t live yet — this feature will unlock soon.', [
-                          { text: 'Got it', style: 'default' },
-                        ])
-                      : setActiveHorizon(h.horizon)
-                    }
-                    style={{
-                      flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1.5,
-                      borderColor: active ? theme.primary : theme.border,
-                      backgroundColor: active ? theme.primary : theme.surface,
-                      alignItems: 'center',
-                      opacity: locked ? 0.6 : 1,
-                    }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      {locked && <Ionicons name="lock-closed" size={11} color={active ? theme.primaryFg : theme.textTertiary} style={{ marginRight: 4 }} />}
-                      <Text style={{ color: active ? theme.primaryFg : theme.textPrimary, fontWeight: '700', fontSize: 13 }}>{h.label}</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            {(() => {
-              const h = horizons.find((x: any) => x.horizon === activeHorizon) || horizons[0];
-              if (h.locked) {
-                return (
-                  <View style={[s.card, { backgroundColor: theme.surface, borderColor: '#F59E0B', borderLeftWidth: 4, borderLeftColor: '#F59E0B' }]}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                      <Ionicons name="lock-closed" size={18} color="#F59E0B" />
-                      <Text style={{ color: theme.textPrimary, fontWeight: '700', marginLeft: 8 }}>{h.label} forecast — Premium</Text>
-                    </View>
-                    <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 19 }}>
-                      Get AI predictions across multiple timeframes — 1 day, 1 week, and 1 month — with horizon-specific confidence scores and price targets.
+        {horizons.length > 0 && (() => {
+          const oneD = horizons.find((h: any) => h.horizon === '1D');
+          const lockedHorizons = horizons.filter((h: any) => h.locked);
+          const unlockedHorizons = horizons.filter((h: any) => !h.locked);
+          const renderForecastCard = (h: any) => {
+            const hColor = h.direction === 'UP' ? theme.bullish : h.direction === 'DOWN' ? theme.bearish : theme.neutral;
+            return (
+              <View key={h.horizon} style={[s.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <View>
+                    <Text style={{ color: theme.textTertiary, fontSize: 11, fontWeight: '600', letterSpacing: 1 }}>DIRECTION</Text>
+                    <Text style={{ color: hColor, fontSize: 18, fontWeight: '700', marginTop: 4 }}>
+                      {h.direction === 'UP' ? '▲ Bullish' : h.direction === 'DOWN' ? '▼ Bearish' : '◆ Neutral'}
                     </Text>
-                    <TouchableOpacity disabled style={{ marginTop: 14, backgroundColor: '#F59E0B', paddingVertical: 12, borderRadius: 999, alignItems: 'center', opacity: 0.85 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Ionicons name="time-outline" size={14} color="#09090B" />
-                        <Text style={{ color: '#09090B', fontWeight: '700', marginLeft: 6 }}>Coming Soon</Text>
-                      </View>
-                    </TouchableOpacity>
                   </View>
-                );
-              }
-              const hColor = h.direction === 'UP' ? theme.bullish : h.direction === 'DOWN' ? theme.bearish : theme.neutral;
-              return (
-                <View style={[s.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <View>
-                      <Text style={{ color: theme.textTertiary, fontSize: 11, fontWeight: '600', letterSpacing: 1 }}>DIRECTION</Text>
-                      <Text style={{ color: hColor, fontSize: 18, fontWeight: '700', marginTop: 4 }}>
-                        {h.direction === 'UP' ? '▲ Bullish' : h.direction === 'DOWN' ? '▼ Bearish' : '◆ Neutral'}
-                      </Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ color: theme.textTertiary, fontSize: 11, fontWeight: '600', letterSpacing: 1 }}>EXP. RETURN</Text>
-                      <Text style={{ color: hColor, fontSize: 18, fontWeight: '700', marginTop: 4 }}>
-                        {h.expected_return_pct > 0 ? '+' : ''}{h.expected_return_pct.toFixed(2)}%
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 12 }}>
-                    <View>
-                      <Text style={{ color: theme.textTertiary, fontSize: 11 }}>Target price</Text>
-                      <Text style={{ color: theme.textPrimary, fontWeight: '600', marginTop: 2 }}>${h.target_price?.toFixed(2)}</Text>
-                    </View>
-                    <View>
-                      <Text style={{ color: theme.textTertiary, fontSize: 11 }}>AI score</Text>
-                      <Text style={{ color: theme.textPrimary, fontWeight: '600', marginTop: 2 }}>{h.ai_score?.toFixed(0)}</Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ color: theme.textTertiary, fontSize: 11 }}>Confidence</Text>
-                      <Text style={{ color: theme.textPrimary, fontWeight: '600', marginTop: 2 }}>{(h.confidence * 100).toFixed(0)}%</Text>
-                    </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ color: theme.textTertiary, fontSize: 11, fontWeight: '600', letterSpacing: 1 }}>EXP. RETURN</Text>
+                    <Text style={{ color: hColor, fontSize: 18, fontWeight: '700', marginTop: 4 }}>
+                      {h.expected_return_pct > 0 ? '+' : ''}{h.expected_return_pct.toFixed(2)}%
+                    </Text>
                   </View>
                 </View>
-              );
-            })()}
-          </View>
-        )}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 12 }}>
+                  <View>
+                    <Text style={{ color: theme.textTertiary, fontSize: 11 }}>Target price</Text>
+                    <Text style={{ color: theme.textPrimary, fontWeight: '600', marginTop: 2 }}>${h.target_price?.toFixed(2)}</Text>
+                  </View>
+                  <View>
+                    <Text style={{ color: theme.textTertiary, fontSize: 11 }}>AI score</Text>
+                    <Text style={{ color: theme.textPrimary, fontWeight: '600', marginTop: 2 }}>{h.ai_score?.toFixed(0)}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ color: theme.textTertiary, fontSize: 11 }}>Confidence</Text>
+                    <Text style={{ color: theme.textPrimary, fontWeight: '600', marginTop: 2 }}>{(h.confidence * 100).toFixed(0)}%</Text>
+                  </View>
+                </View>
+              </View>
+            );
+          };
+
+          return (
+            <View style={{ marginTop: 24, paddingHorizontal: 16 }}>
+              {/* Premium user: full tab strip across all horizons. Free user: only the unlocked horizon shown plainly. */}
+              {isPremium && unlockedHorizons.length > 1 ? (
+                <>
+                  <Text style={[s.cardLabel, { color: theme.textSecondary, marginBottom: 10 }]}>FORECAST HORIZON</Text>
+                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                    {horizons.map((h: any) => {
+                      const active = activeHorizon === h.horizon;
+                      return (
+                        <TouchableOpacity
+                          key={h.horizon}
+                          testID={`horizon-${h.horizon}`}
+                          onPress={() => setActiveHorizon(h.horizon)}
+                          style={{
+                            flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1.5,
+                            borderColor: active ? theme.primary : theme.border,
+                            backgroundColor: active ? theme.primary : theme.surface,
+                            alignItems: 'center',
+                          }}>
+                          <Text style={{ color: active ? theme.primaryFg : theme.textPrimary, fontWeight: '700', fontSize: 13 }}>{h.label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  {renderForecastCard(horizons.find((x: any) => x.horizon === activeHorizon) || horizons[0])}
+                </>
+              ) : (
+                <>
+                  <Text style={[s.cardLabel, { color: theme.textSecondary, marginBottom: 10 }]}>
+                    {oneD?.label?.toUpperCase() || '1 DAY'} FORECAST
+                  </Text>
+                  {oneD && renderForecastCard(oneD)}
+                </>
+              )}
+
+              {/* Premium-horizons disclosure (free users only) */}
+              {!isPremium && lockedHorizons.length > 0 && (
+                <View style={{ marginTop: 16, borderRadius: 14, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface, overflow: 'hidden' }}>
+                  <TouchableOpacity
+                    testID="btn-premium-horizons-disclosure"
+                    onPress={() => setShowPremiumHorizons(v => !v)}
+                    activeOpacity={0.7}
+                    style={{ flexDirection: 'row', alignItems: 'center', padding: 14 }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: '#F59E0B22', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                      <Ionicons name="time-outline" size={16} color="#F59E0B" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 14 }}>Premium horizons coming soon</Text>
+                      <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 2 }}>
+                        1 Week & 1 Month forecasts will unlock with Pav Premium
+                      </Text>
+                    </View>
+                    <Ionicons name={showPremiumHorizons ? 'chevron-up' : 'chevron-down'} size={20} color={theme.textTertiary} />
+                  </TouchableOpacity>
+
+                  {showPremiumHorizons && (
+                    <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
+                      {lockedHorizons.map((h: any) => (
+                        <View key={h.horizon} style={{
+                          flexDirection: 'row', alignItems: 'center',
+                          padding: 12, borderRadius: 10,
+                          borderWidth: 1, borderColor: theme.border,
+                          backgroundColor: theme.background, marginBottom: 8,
+                        }}>
+                          <Ionicons name="lock-closed" size={14} color={theme.textTertiary} style={{ marginRight: 10 }} />
+                          <Text style={{ color: theme.textPrimary, fontWeight: '700', flex: 1 }}>{h.label} forecast</Text>
+                          <Text style={{ color: '#F59E0B', fontSize: 11, fontWeight: '700' }}>COMING SOON</Text>
+                        </View>
+                      ))}
+                      <Text style={{ color: theme.textTertiary, fontSize: 11, lineHeight: 17, marginTop: 4 }}>
+                        Get longer-horizon AI predictions with horizon-specific confidence scores and price targets when Pav Premium launches.
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          );
+        })()}
 
         {pred.narrative && (
           <View style={[s.aiCard, { backgroundColor: theme.surface, borderColor: theme.border, borderLeftColor: (pred as any).premium_required ? '#F59E0B' : theme.neutral }]}>
