@@ -138,6 +138,8 @@ export default function StockDetail() {
                 color={horizonColor}
                 predictedPrice={horizonTarget}
                 bgColor={theme.surface}
+                yAxis={true}
+                yAxisColor={theme.textTertiary}
               />
               <ChartDateAxis
                 timestamps={candles.timestamps || []}
@@ -146,6 +148,7 @@ export default function StockDetail() {
                 targetColor={horizonColor}
                 horizonDays={horizonDays}
                 hasForecast={!!horizonTarget}
+                reservedRight={56}
               />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
                 <Text style={{ color: theme.textTertiary, fontSize: 11 }}>60d history · dashed = AI forecast ({horizonLabel})</Text>
