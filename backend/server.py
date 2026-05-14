@@ -569,8 +569,8 @@ async def login(req: LoginReq):
 
 @api.post("/auth/social", response_model=AuthResp)
 async def social_login(req: SocialReq):
-    """Demo social login — accepts provider + email (Google/Apple). In prod, verify ID token."""
-    if req.provider not in ("google", "apple"):
+    """Demo social login — accepts provider + email (Google/Apple/Facebook). In prod, verify ID token."""
+    if req.provider not in ("google", "apple", "facebook"):
         raise HTTPException(400, "Unsupported provider")
     email = req.email.lower()
     doc = await db.users.find_one({"email": email})

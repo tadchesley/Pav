@@ -34,8 +34,9 @@ export default function AuthScreen() {
     } finally { setLoading(false); }
   };
 
-  const social = async (provider: 'google' | 'apple') => {
+  const social = async (provider: 'google' | 'apple' | 'facebook') => {
     if (!agreed && mode === 'signup') { Alert.alert('Agreement required', 'Please accept the Terms first.'); return; }
+    const providerLabel = provider.charAt(0).toUpperCase() + provider.slice(1);
     const doLogin = async (input: string) => {
       setLoading(true);
       try {
@@ -46,7 +47,7 @@ export default function AuthScreen() {
       } finally { setLoading(false); }
     };
     if (Platform.OS === 'ios' && (Alert as any).prompt) {
-      (Alert as any).prompt(`Sign in with ${provider}`, 'Enter your email (demo social sign-in)', (input?: string) => {
+      (Alert as any).prompt(`Sign in with ${providerLabel}`, 'Enter your email (demo social sign-in)', (input?: string) => {
         if (input) doLogin(input);
       }, 'plain-text');
     } else {
@@ -143,6 +144,16 @@ export default function AuthScreen() {
             <Ionicons name="logo-apple" size={20} color={theme.textPrimary} />
             <Text style={[s.socialText, { color: theme.textPrimary }]}>Continue with Apple</Text>
           </TouchableOpacity>
+          <TouchableOpacity testID="btn-facebook" onPress={() => social('facebook')} style={[s.socialBtn, { borderColor: theme.border, backgroundColor: theme.surface }]}>
+            <Ionicons name="logo-facebook" size={20} color="#1877F2" />
+            <Text style={[s.socialText, { color: theme.textPrimary }]}>Continue with Facebook</Text>
+          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 6 }}>
+            <Ionicons name="information-circle-outline" size={11} color={theme.textTertiary} />
+            <Text style={{ color: theme.textTertiary, fontSize: 10, marginLeft: 4 }}>
+              Social sign-in is in demo mode — real OAuth coming with App Store launch
+            </Text>
+          </View>
 
           <TouchableOpacity onPress={() => router.push('/terms')} testID="link-terms">
             <Text style={[s.disclaimer, { color: theme.textTertiary }]}>
