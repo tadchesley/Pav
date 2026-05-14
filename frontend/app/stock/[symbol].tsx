@@ -20,7 +20,7 @@ export default function StockDetail() {
   const [candles, setCandles] = useState<any>(null);
   const [horizons, setHorizons] = useState<any[]>([]);
   const [quoteMeta, setQuoteMeta] = useState<{ delayed: boolean; delayed_seconds?: number } | null>(null);
-  const [activeHorizon, setActiveHorizon] = useState<string>('1M');
+  const [activeHorizon, setActiveHorizon] = useState<string>('1D');
   const [loading, setLoading] = useState(true);
   const [inWatch, setInWatch] = useState(false);
 
@@ -38,7 +38,11 @@ export default function StockDetail() {
       setPred(p.data);
       setCandles(c.data);
       setInWatch(w.data.items.some((x: any) => x.symbol === symbol));
-      setHorizons(h.data.horizons || []);
+      const hs = h.data.horizons || [];
+      setHorizons(hs);
+      // Default to the first unlocked horizon so free users land on something they can see.
+      const firstUnlocked = hs.find((x: any) => !x.locked);
+      if (firstUnlocked) setActiveHorizon(firstUnlocked.horizon);
       setQuoteMeta({ delayed: !!q.data.delayed, delayed_seconds: q.data.delayed_seconds });
     } catch (e: any) {
       Alert.alert('Error', e?.response?.data?.detail || 'Failed to load');
