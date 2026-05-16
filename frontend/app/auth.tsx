@@ -130,30 +130,9 @@ export default function AuthScreen() {
             )}
           </TouchableOpacity>
 
-          <View style={s.divider}>
-            <View style={[s.line, { backgroundColor: theme.border }]} />
-            <Text style={[s.orText, { color: theme.textTertiary }]}>OR</Text>
-            <View style={[s.line, { backgroundColor: theme.border }]} />
-          </View>
-
-          <TouchableOpacity testID="btn-google" onPress={() => social('google')} style={[s.socialBtn, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-            <Ionicons name="logo-google" size={20} color={theme.textPrimary} />
-            <Text style={[s.socialText, { color: theme.textPrimary }]}>Continue with Google</Text>
-          </TouchableOpacity>
-          <TouchableOpacity testID="btn-apple" onPress={() => social('apple')} style={[s.socialBtn, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-            <Ionicons name="logo-apple" size={20} color={theme.textPrimary} />
-            <Text style={[s.socialText, { color: theme.textPrimary }]}>Continue with Apple</Text>
-          </TouchableOpacity>
-          <TouchableOpacity testID="btn-facebook" onPress={() => social('facebook')} style={[s.socialBtn, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-            <Ionicons name="logo-facebook" size={20} color="#1877F2" />
-            <Text style={[s.socialText, { color: theme.textPrimary }]}>Continue with Facebook</Text>
-          </TouchableOpacity>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 6 }}>
-            <Ionicons name="information-circle-outline" size={11} color={theme.textTertiary} />
-            <Text style={{ color: theme.textTertiary, fontSize: 10, marginLeft: 4 }}>
-              Social sign-in is in demo mode — real OAuth coming with App Store launch
-            </Text>
-          </View>
+          {/* Social sign-in (Google / Apple / Facebook) is intentionally disabled for launch.
+              Backend endpoint /api/auth/social still works — to re-enable, restore the OR divider
+              and the social buttons. Real OAuth integration will be wired before re-enable. */}
 
           <TouchableOpacity onPress={() => router.push('/terms')} testID="link-terms">
             <Text style={[s.disclaimer, { color: theme.textTertiary }]}>
