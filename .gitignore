@@ -80,19 +80,13 @@ memory/test_credentials.md
 
 # Mobile development
 android-sdk/-e 
-# Environment and credential files
-.env
-.env.*
-*.env
+# Credential files (Emergent manages .env files in deployment, do not block them)
 credentials.json
 *.pem
 *.key
 .credentials
 -e 
-# Environment and credential files
-.env
-.env.*
-*.env
+# Credential files (duplicate block — kept for safety, .env intentionally NOT excluded)
 credentials.json
 *.pem
 *.key
