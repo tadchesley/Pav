@@ -38,7 +38,7 @@ export function Navbar() {
             FAQ
           </Link>
         </div>
-        <ComingSoonButton variant="primary" className="!py-2 !px-4 text-sm">
+        <ComingSoonButton variant="primary" className="!py-2 !px-4 text-sm" location="navbar">
           Get Pav
         </ComingSoonButton>
       </nav>

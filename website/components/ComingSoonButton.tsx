@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Apple, Play, X, ArrowRight } from 'lucide-react';
+import { track } from '@vercel/analytics';
 
 type Variant = 'primary' | 'secondary';
 
@@ -10,13 +11,21 @@ export function ComingSoonButton({
   variant = 'primary',
   className = '',
   withArrow = false,
+  location = 'unknown',
 }: {
   children: React.ReactNode;
   variant?: Variant;
   className?: string;
   withArrow?: boolean;
+  location?: string;
 }) {
   const [open, setOpen] = useState(false);
+
+  const handleClick = () => {
+    // Track the click in Vercel Analytics (no-op locally, live on Vercel)
+    track('get_pav_clicked', { location });
+    setOpen(true);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -37,7 +46,7 @@ export function ComingSoonButton({
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={handleClick}
         className={`${base} ${className}`}
       >
         {children}

@@ -45,7 +45,7 @@ export function Pricing() {
               <span className="text-5xl font-bold text-text-primary">$0</span>
               <span className="text-text-tertiary ml-2">/ forever</span>
             </div>
-            <ComingSoonButton variant="secondary" className="w-full mb-8">
+            <ComingSoonButton variant="secondary" className="w-full mb-8" location="pricing_free">
               Download Pav
             </ComingSoonButton>
             <ul className="space-y-3">

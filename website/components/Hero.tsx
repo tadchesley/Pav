@@ -25,7 +25,7 @@ export function Hero() {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-          <ComingSoonButton variant="primary" className="w-full sm:w-auto" withArrow>
+          <ComingSoonButton variant="primary" className="w-full sm:w-auto" withArrow location="hero">
             Get Pav
           </ComingSoonButton>
           <Link href="/#how-it-works" className="btn-secondary w-full sm:w-auto">

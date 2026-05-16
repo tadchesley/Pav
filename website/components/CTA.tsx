@@ -21,7 +21,7 @@ export function CTA() {
               Download Pav and start exploring AI-powered predictions across 871 tickers — completely free.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <ComingSoonButton variant="primary" withArrow>
+              <ComingSoonButton variant="primary" withArrow location="footer_cta">
                 Get Pav free
               </ComingSoonButton>
             </div>
