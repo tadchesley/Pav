@@ -1,5 +1,6 @@
 import { Check, Sparkles } from 'lucide-react';
 import { ComingSoonButton } from './ComingSoonButton';
+import { WaitlistForm } from './WaitlistForm';
 
 const freeFeatures = [
   'Up to 15 symbols on watchlist',
@@ -85,12 +86,7 @@ export function Pricing() {
               <p className="text-sm text-text-tertiary mb-6">
                 or <span className="text-text-secondary">$49.99/year</span> — save 17%
               </p>
-              <button
-                disabled
-                className="btn-secondary w-full mb-8 opacity-60 cursor-not-allowed"
-              >
-                Notify me at launch
-              </button>
+              <WaitlistForm />
               <ul className="space-y-3">
                 {premiumFeatures.map((f) => (
                   <li key={f} className="flex items-start gap-3 text-sm text-text-secondary">

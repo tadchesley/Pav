@@ -5,7 +5,10 @@ import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://pavapp.com';
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: 'Pav — The pulse of the market.',
   description:
     'Pav delivers AI-powered stock predictions across 871 tickers. Real-time prices, Claude-powered analysis, and a beautiful mobile experience.',
@@ -18,12 +21,16 @@ export const metadata: Metadata = {
     'Pav',
   ],
   authors: [{ name: 'Pav' }],
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
     title: 'Pav — The pulse of the market.',
     description:
       'AI-powered stock, crypto, FX, and commodity predictions across 871 tickers. Built for serious traders.',
     type: 'website',
     siteName: 'Pav',
+    url: '/',
   },
   twitter: {
     card: 'summary_large_image',
