@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Apple, Play, X, ArrowRight } from 'lucide-react';
 import { track } from '@vercel/analytics';
+import { WaitlistForm } from './WaitlistForm';
 
 type Variant = 'primary' | 'secondary';
 
@@ -101,27 +102,25 @@ export function ComingSoonButton({
             <p className="text-text-secondary leading-relaxed mb-6">
               Pav is launching on the{' '}
               <span className="text-text-primary font-medium">Apple App Store</span> and{' '}
-              <span className="text-text-primary font-medium">Google Play</span> soon. Stay tuned!
+              <span className="text-text-primary font-medium">Google Play</span> soon.
+              Drop your email and we&rsquo;ll let you know the moment it&rsquo;s live.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-elev border border-border text-sm text-text-secondary">
-                <Apple className="w-4 h-4" />
-                <span>App Store — soon</span>
-              </div>
-              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-elev border border-border text-sm text-text-secondary">
-                <Play className="w-4 h-4" />
-                <span>Google Play — soon</span>
-              </div>
+            <div className="text-left">
+              <WaitlistForm location={`modal_${location}`} />
             </div>
 
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="mt-7 text-sm text-text-tertiary hover:text-text-primary transition-colors"
-            >
-              Got it
-            </button>
+            <div className="flex items-center justify-center gap-3 text-xs text-text-tertiary -mt-2">
+              <div className="flex items-center gap-1.5">
+                <Apple className="w-3.5 h-3.5" />
+                <span>App Store</span>
+              </div>
+              <span className="text-text-tertiary/50">•</span>
+              <div className="flex items-center gap-1.5">
+                <Play className="w-3.5 h-3.5" />
+                <span>Google Play</span>
+              </div>
+            </div>
           </div>
         </div>
       )}

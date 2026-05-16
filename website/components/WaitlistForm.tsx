@@ -9,7 +9,7 @@ const LOOPS_FORM_ENDPOINT =
 
 type Status = 'idle' | 'loading' | 'success' | 'error';
 
-export function WaitlistForm() {
+export function WaitlistForm({ location = 'pricing_premium' }: { location?: string } = {}) {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -55,7 +55,7 @@ export function WaitlistForm() {
         return;
       }
 
-      track('waitlist_signup', { location: 'pricing_premium' });
+      track('waitlist_signup', { location });
       setStatus('success');
       setEmail('');
     } catch (_err) {
